@@ -6,11 +6,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.ui.text.TextStyle
 import com.chrisjenx.compose2pdf.LocalPdfLinkCollector
-import com.chrisjenx.compose2pdf.PdfFontFamily
 import com.chrisjenx.compose2pdf.PdfLinkAnnotation
 import com.chrisjenx.compose2pdf.PdfLinkCollector
 import com.chrisjenx.compose2pdf.PdfPageConfig
@@ -34,7 +34,7 @@ internal object PdfRenderer {
         config: PdfPageConfig,
         density: Density,
         mode: RenderMode,
-        useBundledFont: Boolean,
+        defaultFontFamily: FontFamily?,
         content: @Composable () -> Unit,
     ): ByteArray {
         return renderMultiPage(
@@ -42,7 +42,7 @@ internal object PdfRenderer {
             config = config,
             density = density,
             mode = mode,
-            useBundledFont = useBundledFont,
+            defaultFontFamily = defaultFontFamily,
             content = { content() },
         )
     }
@@ -52,13 +52,13 @@ internal object PdfRenderer {
         config: PdfPageConfig,
         density: Density,
         mode: RenderMode,
-        useBundledFont: Boolean,
+        defaultFontFamily: FontFamily?,
         content: @Composable (pageIndex: Int) -> Unit,
     ): ByteArray {
         require(pageCount > 0) { "pageCount must be positive, was $pageCount" }
         return when (mode) {
-            RenderMode.VECTOR -> renderVector(pageCount, config, density, useBundledFont, content)
-            RenderMode.RASTER -> renderRaster(pageCount, config, density, useBundledFont, content)
+            RenderMode.VECTOR -> renderVector(pageCount, config, density, defaultFontFamily, content)
+            RenderMode.RASTER -> renderRaster(pageCount, config, density, defaultFontFamily, content)
         }
     }
 
@@ -68,7 +68,7 @@ internal object PdfRenderer {
         pageCount: Int,
         config: PdfPageConfig,
         density: Density,
-        useBundledFont: Boolean,
+        defaultFontFamily: FontFamily?,
         content: @Composable (pageIndex: Int) -> Unit,
     ): ByteArray {
         val pxW = (config.contentWidth.value * density.density).toInt()
@@ -76,23 +76,16 @@ internal object PdfRenderer {
 
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
+        val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
         try {
             for (pageIndex in 0 until pageCount) {
                 val linkCollector = PdfLinkCollector()
                 val svg = ComposeToSvg.render(pxW, pxH, density) {
-                    CompositionLocalProvider(
-                        LocalPdfLinkCollector provides linkCollector,
-                    ) {
-                        if (useBundledFont) {
-                            ProvideTextStyle(TextStyle(fontFamily = PdfFontFamily)) {
-                                content(pageIndex)
-                            }
-                        } else {
-                            content(pageIndex)
-                        }
+                    WrapContent(defaultFontFamily, linkCollector) {
+                        content(pageIndex)
                     }
                 }
-                SvgToPdfConverter.addPage(pdfDoc, svg, config.width.value, config.height.value, fontCache)
+                SvgToPdfConverter.addPage(pdfDoc, svg, config.width.value, config.height.value, fontCache, imageCache)
                 addLinkAnnotations(pdfDoc.getPage(pageIndex), config, linkCollector.links)
             }
             val baos = ByteArrayOutputStream()
@@ -109,7 +102,7 @@ internal object PdfRenderer {
         pageCount: Int,
         config: PdfPageConfig,
         density: Density,
-        useBundledFont: Boolean,
+        defaultFontFamily: FontFamily?,
         content: @Composable (pageIndex: Int) -> Unit,
     ): ByteArray {
         val contentWidthPx = (config.contentWidth.value * density.density).toInt()
@@ -124,16 +117,8 @@ internal object PdfRenderer {
                     height = contentHeightPx,
                     density = density,
                     content = {
-                        CompositionLocalProvider(
-                            LocalPdfLinkCollector provides linkCollector,
-                        ) {
-                            if (useBundledFont) {
-                                ProvideTextStyle(TextStyle(fontFamily = PdfFontFamily)) {
-                                    content(pageIndex)
-                                }
-                            } else {
-                                content(pageIndex)
-                            }
+                        WrapContent(defaultFontFamily, linkCollector) {
+                            content(pageIndex)
                         }
                     },
                 )
@@ -145,6 +130,23 @@ internal object PdfRenderer {
             return baos.toByteArray()
         } finally {
             doc.close()
+        }
+    }
+
+    @Composable
+    private fun WrapContent(
+        defaultFontFamily: FontFamily?,
+        linkCollector: PdfLinkCollector,
+        content: @Composable () -> Unit,
+    ) {
+        CompositionLocalProvider(LocalPdfLinkCollector provides linkCollector) {
+            if (defaultFontFamily != null) {
+                ProvideTextStyle(TextStyle(fontFamily = defaultFontFamily)) {
+                    content()
+                }
+            } else {
+                content()
+            }
         }
     }
 
@@ -205,9 +207,6 @@ internal object PdfRenderer {
         links: List<PdfLinkAnnotation>,
     ) {
         if (links.isEmpty()) return
-        val pageHeight = config.height.value
-        val marginLeft = config.margins.left.value
-        val marginTop = config.margins.top.value
 
         for (link in links) {
             val annotation = PDAnnotationLink()
@@ -215,11 +214,15 @@ internal object PdfRenderer {
             action.uri = link.href
             annotation.action = action
 
-            // Convert from Compose coordinates (Y-down from content origin)
-            // to PDF coordinates (Y-up from page origin)
-            val llx = marginLeft + link.x
-            val lly = pageHeight - marginTop - link.y - link.height
-            annotation.rectangle = PDRectangle(llx, lly, link.width, link.height)
+            annotation.rectangle = CoordinateTransform.svgToPdfRect(
+                svgX = link.x,
+                svgY = link.y,
+                width = link.width,
+                height = link.height,
+                pageHeight = config.height.value,
+                marginLeft = config.margins.left.value,
+                marginTop = config.margins.top.value,
+            )
 
             // Invisible border (the content provides visual styling)
             val borderStyle = PDBorderStyleDictionary()

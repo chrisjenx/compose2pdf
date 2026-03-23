@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.toSize
  * @param width Width in PDF points.
  * @param height Height in PDF points.
  */
-data class PdfLinkAnnotation(
+internal data class PdfLinkAnnotation(
     val href: String,
     val x: Float,
     val y: Float,
@@ -30,8 +30,8 @@ data class PdfLinkAnnotation(
  * Collector for link annotations during PDF rendering.
  * Set via [LocalPdfLinkCollector] during renderToPdf calls.
  */
-class PdfLinkCollector {
-    private val _links = mutableListOf<PdfLinkAnnotation>()
+internal class PdfLinkCollector {
+    private val _links = java.util.concurrent.CopyOnWriteArrayList<PdfLinkAnnotation>()
     val links: List<PdfLinkAnnotation> get() = _links
 
     fun add(annotation: PdfLinkAnnotation) {
@@ -47,7 +47,7 @@ class PdfLinkCollector {
  * CompositionLocal providing access to the link collector during PDF rendering.
  * When rendering to screen (not PDF), this is null and link annotations are ignored.
  */
-val LocalPdfLinkCollector = compositionLocalOf<PdfLinkCollector?> { null }
+internal val LocalPdfLinkCollector = compositionLocalOf<PdfLinkCollector?> { null }
 
 /**
  * Wraps content in a clickable link annotation for PDF output.

@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Density
-import com.chrisjenx.compose2pdf.PdfFontFamily
+import com.chrisjenx.compose2pdf.InterFontFamily
 import com.chrisjenx.compose2pdf.PdfPageConfig
 import com.chrisjenx.compose2pdf.RenderMode
 import com.chrisjenx.compose2pdf.renderToPdf
@@ -82,7 +82,7 @@ class FidelityTest {
         val contentH = (fixtureConfig.contentHeight.value * density.density).toInt()
 
         val wrappedContent: @Composable () -> Unit = {
-            ProvideTextStyle(TextStyle(fontFamily = PdfFontFamily)) {
+            ProvideTextStyle(TextStyle(fontFamily = InterFontFamily)) {
                 fixture.content()
             }
         }
@@ -113,20 +113,20 @@ class FidelityTest {
         val rasterImage = rasterizePdf(rasterPdfBytes, renderDpi)
         saveImage(rasterImage, imagesDir, "${fixture.name}-raster.png")
 
-        // 5. Vector metrics
+        // 5. Vector metrics + diff
         val vectorRmse = ImageMetrics.computeRmse(composeImage, vectorImage)
         val vectorSsim = ImageMetrics.computeSsim(composeImage, vectorImage)
         val vectorExactMatch = ImageMetrics.computeExactMatchPercent(composeImage, vectorImage)
         val vectorMaxError = ImageMetrics.computeMaxPixelError(composeImage, vectorImage)
-        val vectorDiff = ImageMetrics.generateDiffImage(composeImage, vectorImage)
+        val vectorDiff = ImageMetrics.generateStructuralDiffImage(composeImage, vectorImage)
         saveImage(vectorDiff, imagesDir, "${fixture.name}-vector-diff.png")
 
-        // 6. Raster metrics
+        // 6. Raster metrics + diff
         val rasterRmse = ImageMetrics.computeRmse(composeImage, rasterImage)
         val rasterSsim = ImageMetrics.computeSsim(composeImage, rasterImage)
         val rasterExactMatch = ImageMetrics.computeExactMatchPercent(composeImage, rasterImage)
         val rasterMaxError = ImageMetrics.computeMaxPixelError(composeImage, rasterImage)
-        val rasterDiff = ImageMetrics.generateDiffImage(composeImage, rasterImage)
+        val rasterDiff = ImageMetrics.generateStructuralDiffImage(composeImage, rasterImage)
         saveImage(rasterDiff, imagesDir, "${fixture.name}-raster-diff.png")
 
         return FidelityResult(

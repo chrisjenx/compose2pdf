@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 internal object FontResolver {
 
+    private val logger = java.util.logging.Logger.getLogger(FontResolver::class.java.name)
+
     // Global cache: font search key → file path (file system search is expensive)
     // Uses Optional because ConcurrentHashMap doesn't allow null values
     private val filePathCache = ConcurrentHashMap<String, Optional<File>>()
@@ -49,13 +51,15 @@ internal object FontResolver {
 
         // Try bundled fonts first (guaranteed to match Compose rendering)
         for (fam in families) {
-            val bundledFile = resolveBundledFont(fam, bold, italic)
-            if (bundledFile != null) {
+            val bundledStream = resolveBundledFont(fam, bold, italic)
+            if (bundledStream != null) {
                 try {
-                    val font = PDType0Font.load(doc, bundledFile)
+                    val font = bundledStream.use { PDType0Font.load(doc, it) }
                     fontCache[key] = font
                     return font
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    logger.warning("Failed to load bundled font '$fam' (bold=$bold, italic=$italic): ${e.message}")
+                }
             }
         }
 
@@ -68,8 +72,8 @@ internal object FontResolver {
                     val font = PDType0Font.load(doc, fontFile)
                     fontCache[key] = font
                     return font
-                } catch (_: Exception) {
-                    // Can't load this font file, try next family
+                } catch (e: Exception) {
+                    logger.fine("Failed to load system font '$fam' from ${fontFile.path}: ${e.message}")
                 }
             }
         }
@@ -147,8 +151,8 @@ internal object FontResolver {
                     .filter { !isVariableFont(it) }
                     .firstOrNull()
                 if (found != null) return found
-            } catch (_: Exception) {
-                // Permission errors, symlink issues, etc.
+            } catch (e: Exception) {
+                logger.fine("Error searching font directory '$dir': ${e.message}")
             }
         }
 
@@ -174,7 +178,9 @@ internal object FontResolver {
                     raf.skipBytes(12) // skip checksum, offset, length
                 }
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            logger.fine("Error reading font file '${file.path}': ${e.message}")
+        }
         return false
     }
 
@@ -250,22 +256,9 @@ internal object FontResolver {
         Triple("Inter", true, true) to "fonts/Inter-BoldItalic.ttf",
     )
 
-    private val tempFileCache = ConcurrentHashMap<String, Optional<File>>()
-
-    private fun resolveBundledFont(family: String, bold: Boolean, italic: Boolean): File? {
+    private fun resolveBundledFont(family: String, bold: Boolean, italic: Boolean): java.io.InputStream? {
         val resourcePath = BUNDLED_FONTS[Triple(family, bold, italic)] ?: return null
-        return tempFileCache.computeIfAbsent(resourcePath) { path ->
-            val input = Thread.currentThread().contextClassLoader
-                ?.getResourceAsStream(path)
-            if (input == null) {
-                Optional.empty()
-            } else {
-                val tempFile = File.createTempFile("compose-pdf-font-", ".ttf")
-                tempFile.deleteOnExit()
-                input.use { it.copyTo(tempFile.outputStream()) }
-                Optional.of(tempFile)
-            }
-        }.orElse(null)
+        return Thread.currentThread().contextClassLoader?.getResourceAsStream(resourcePath)
     }
 
     private val GENERIC_FAMILIES = setOf(

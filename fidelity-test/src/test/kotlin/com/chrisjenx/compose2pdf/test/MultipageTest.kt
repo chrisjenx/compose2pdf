@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.chrisjenx.compose2pdf.PdfFontFamily
+import com.chrisjenx.compose2pdf.InterFontFamily
 import com.chrisjenx.compose2pdf.PdfPageConfig
 import com.chrisjenx.compose2pdf.RenderMode
 import com.chrisjenx.compose2pdf.renderToPdf
@@ -93,7 +93,7 @@ class MultipageTest {
             val modeName = mode.name.lowercase()
 
             val pdfBytes = renderToPdf(pages = pageCount, config = config, density = density, mode = mode) { pageIndex ->
-                ProvideTextStyle(TextStyle(fontFamily = PdfFontFamily)) {
+                ProvideTextStyle(TextStyle(fontFamily = InterFontFamily)) {
                     pageContents[pageIndex]()
                 }
             }
@@ -118,7 +118,7 @@ class MultipageTest {
                     val contentH = (config.contentHeight.value * density.density).toInt()
 
                     val contentImage = renderComposeReference(contentW, contentH, density) {
-                        ProvideTextStyle(TextStyle(fontFamily = PdfFontFamily)) {
+                        ProvideTextStyle(TextStyle(fontFamily = InterFontFamily)) {
                             pageContents[i]()
                         }
                     }
