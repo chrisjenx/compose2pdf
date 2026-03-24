@@ -1,0 +1,50 @@
+name: Compose Compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 9 * * 1' # Weekly Monday 9am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  load-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.load.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: load
+        run: echo "matrix=$(jq -c '.versions' .github/compose-versions.json)" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: load-versions
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        version: ${{ fromJson(needs.load-versions.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    name: CMP ${{ matrix.version.compose-version }} / ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Override versions
+        run: |
+          perl -i -pe "s/^kotlin = .*/kotlin = \"${{ matrix.version.kotlin-version }}\"/" gradle/libs.versions.toml
+          perl -i -pe "s/^compose-multiplatform = .*/compose-multiplatform = \"${{ matrix.version.compose-version }}\"/" gradle/libs.versions.toml
+          echo "Testing CMP ${{ matrix.version.compose-version }} + Kotlin ${{ matrix.version.kotlin-version }}"
+
+      - name: Build and test
+        run: ./gradlew :compose2pdf:build

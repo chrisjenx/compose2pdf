@@ -13,7 +13,7 @@
 
 ## Tech Stack
 
-- **Kotlin** 2.1.21, JVM target only
+- **Kotlin** 2.3.20, JVM target only
 - **Compose Multiplatform** 1.10.3 (Desktop)
 - **Apache PDFBox** 3.0.7 (SVG→PDF conversion, image embedding, font subsetting)
 - **Gradle** 8.14 — versions centralized in `gradle/libs.versions.toml`
@@ -41,6 +41,8 @@ Visual regression suite comparing Compose reference renders against rasterized P
 
 GitHub Actions (`.github/workflows/ci.yml`): build + unit tests + fidelity tests on ubuntu/macos, JDK 17. Uses `xvfb-run` for headless Compose on Linux.
 
+Compose Multiplatform compatibility matrix (`.github/workflows/compatibility.yml`): tests against the 3 most recent CMP versions (defined in `.github/compose-versions.json`). Auto-updated weekly by `.github/workflows/update-compose-versions.yml`.
+
 ## Public API
 
 ```kotlin
@@ -51,7 +53,7 @@ PdfRoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)
 Shape.asPdfSafe()
 ```
 
-Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3), `PdfMargins` (None/Normal/Standard), `Density`, `RenderMode` (VECTOR/RASTER), `InterFontFamily`, `Compose2PdfException`.
+Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargins + `landscape()`), `PdfMargins` (None/Narrow/Normal + `symmetric()`), `Density`, `RenderMode` (VECTOR/RASTER), `InterFontFamily`, `Compose2PdfException`.
 
 ## Architecture
 

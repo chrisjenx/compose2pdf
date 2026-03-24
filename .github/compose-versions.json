@@ -1,0 +1,7 @@
+{
+  "versions": [
+    {"compose-version": "1.9.3", "kotlin-version": "2.3.20"},
+    {"compose-version": "1.10.3", "kotlin-version": "2.3.20"},
+    {"compose-version": "1.11.0-alpha04", "kotlin-version": "2.3.20"}
+  ]
+}
