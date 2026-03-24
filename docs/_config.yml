@@ -1,0 +1,45 @@
+title: compose2pdf
+description: Render Compose Desktop content directly to PDF
+remote_theme: just-the-docs/just-the-docs@v0.10.0
+
+url: "https://nickhall-ck.github.io"
+baseurl: "/compose2pdf"
+
+aux_links:
+  GitHub: https://github.com/nickhall-ck/compose2pdf
+
+aux_links_new_tab: true
+
+heading_anchors: true
+search_enabled: true
+back_to_top: true
+back_to_top_text: "Back to top"
+
+color_scheme: light
+
+footer_content: >-
+  compose2pdf is released under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache-2.0 License</a>.
+
+callouts:
+  note:
+    title: Note
+    color: blue
+  tip:
+    title: Tip
+    color: green
+  warning:
+    title: Warning
+    color: yellow
+  important:
+    title: Important
+    color: red
+
+nav_sort: case_insensitive
+
+kramdown:
+  syntax_highlighter_opts:
+    block:
+      line_numbers: false
+
+plugins:
+  - jekyll-seo-tag

@@ -1,5 +1,8 @@
 # compose2pdf
 
+[![CI](https://github.com/nickhall-ck/compose2pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/nickhall-ck/compose2pdf/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 Render [Compose Desktop](https://www.jetbrains.com/compose-multiplatform/) content directly to PDF.
 
 ```kotlin
@@ -14,9 +17,9 @@ File("hello.pdf").writeBytes(pdfBytes)
 - **Vector PDF output** — text is selectable, scales to any zoom level
 - **Raster fallback** — pixel-perfect rendering as an embedded image
 - **Font embedding** — bundled Inter fonts or system font resolution with automatic subsetting
-- **Link annotations** — clickable URLs in the PDF
+- **Link annotations** — clickable URLs in the PDF via `PdfLink`
 - **Multi-page** — render multiple pages in a single PDF
-- **Page presets** — A4, Letter, A3 with configurable margins
+- **Page presets** — A4, Letter, A3 with configurable margins and landscape support
 
 ## Installation
 
@@ -27,19 +30,18 @@ dependencies {
 }
 ```
 
-Requires JDK 17+ and Compose Desktop.
+Requires **JDK 17+** and **Compose Desktop** (Compose Multiplatform 1.9+).
 
-## Usage
+## Quick start
 
 ### Single page
 
 ```kotlin
 val pdf = renderToPdf(
-    config = PdfPageConfig.A4,
-    density = Density(2f),
+    config = PdfPageConfig.LetterWithMargins,
     mode = RenderMode.VECTOR,
 ) {
-    Column(Modifier.padding(24.dp)) {
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
         Text("Invoice #1234", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text("Amount: $1,250.00")
     }
@@ -50,7 +52,9 @@ val pdf = renderToPdf(
 
 ```kotlin
 val pdf = renderToPdf(pages = 3) { pageIndex ->
-    Text("Page ${pageIndex + 1}")
+    Column(Modifier.fillMaxSize()) {
+        Text("Page ${pageIndex + 1}")
+    }
 }
 ```
 
@@ -58,44 +62,19 @@ val pdf = renderToPdf(pages = 3) { pageIndex ->
 
 ```kotlin
 PdfLink(href = "https://example.com") {
-    Text("Click me", color = Color.Blue)
+    Text("Click me", color = Color.Blue, textDecoration = TextDecoration.Underline)
 }
 ```
 
-### PDF-safe rounded corners
+## Documentation
 
-```kotlin
-// Non-uniform radii that render correctly in PDF
-Box(Modifier.clip(PdfRoundedCornerShape(topStart = 24.dp, bottomEnd = 24.dp)))
-```
+**[Full documentation](https://nickhall-ck.github.io/compose2pdf/)** — getting started, usage guides, API reference, examples, and more.
 
-## API Reference
-
-| Function / Type | Description |
-|---|---|
-| `renderToPdf(config, density, mode, defaultFontFamily) { content }` | Single page PDF |
-| `renderToPdf(pages, config, density, mode, defaultFontFamily) { pageIndex -> content }` | Multi-page PDF |
-| `PdfLink(href) { content }` | Clickable link annotation |
-| `PdfRoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)` | PDF-safe rounded corners |
-| `Shape.asPdfSafe()` | Wrap any shape for correct PDF rendering |
-| `PdfPageConfig.A4` / `.Letter` / `.A3` | Page size presets |
-| `PdfMargins(top, bottom, left, right)` | Page margins |
-| `RenderMode.VECTOR` / `.RASTER` | Rendering mode |
-
-## How it works
-
-```
-Compose content → Skia PictureRecorder → SVGCanvas → SVG string
-    → SvgToPdfConverter → PDFBox vector drawing commands → PDF ByteArray
-```
-
-Vector mode preserves text as selectable glyphs with embedded fonts. Raster mode captures a bitmap and embeds it as a PDF image.
-
-## Known limitations
-
-- Depends on `CanvasLayersComposeScene` (`@InternalComposeUiApi`) — no public alternative exists
-- Variable fonts are skipped (PDFBox renders them at default axis values); only static `.ttf`/`.otf` are embedded
-- SVGCanvas approximates non-uniform rounded rects as bezier paths — use `PdfRoundedCornerShape` for best results
+- [Getting Started](https://nickhall-ck.github.io/compose2pdf/getting-started)
+- [Usage Guide](https://nickhall-ck.github.io/compose2pdf/usage/)
+- [API Reference](https://nickhall-ck.github.io/compose2pdf/api/)
+- [Examples](https://nickhall-ck.github.io/compose2pdf/examples/)
+- [Troubleshooting](https://nickhall-ck.github.io/compose2pdf/guides/troubleshooting)
 
 ## License
 
