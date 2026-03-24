@@ -12,6 +12,14 @@ val pdfBytes = renderToPdf {
 File("hello.pdf").writeBytes(pdfBytes)
 ```
 
+### Compose in, PDF out
+
+| Compose (reference render) | PDF (vector output) |
+|:---:|:---:|
+| <img src="docs/assets/images/fidelity-invoice-compose.png" width="350" alt="Compose render"> | <img src="docs/assets/images/fidelity-invoice-pdf.png" width="350" alt="PDF output"> |
+
+*The PDF output is virtually identical to the Compose reference — text is selectable, fonts are embedded, and the file is only 17 KB.*
+
 ## Features
 
 - **Vector PDF output** — text is selectable, scales to any zoom level

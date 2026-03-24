@@ -14,6 +14,20 @@ nav_order: 1
 
 ---
 
+## Compose in, PDF out — pixel-perfect
+
+Write standard `@Composable` functions. Get production-quality PDFs.
+
+| Compose (reference render) | PDF (vector output) |
+|:---:|:---:|
+| ![Compose render]({{ site.baseurl }}/assets/images/fidelity-report-compose.png){: .rounded .shadow } | ![PDF render]({{ site.baseurl }}/assets/images/fidelity-report-pdf.png){: .rounded .shadow } |
+
+*A performance report with KPI cards, bar charts, and data tables — the PDF output is virtually identical to the Compose reference.*
+
+---
+
+## Three lines of code
+
 ```kotlin
 val pdfBytes = renderToPdf {
     Text("Hello, PDF!")
@@ -21,10 +35,16 @@ val pdfBytes = renderToPdf {
 File("hello.pdf").writeBytes(pdfBytes)
 ```
 
-That's it. Three lines to go from Compose to PDF.
+That's it. `renderToPdf` takes a `@Composable` lambda and returns a `ByteArray`.
 
-![Hello PDF example]({{ site.baseurl }}/assets/images/01-hello.png){: .rounded .shadow .mb-4 }
-*Output of the code above — vector text on an A4 page ([download PDF]({{ site.baseurl }}/assets/pdfs/01-hello.pdf))*
+---
+
+## Real-world output
+
+| Detailed Invoice | Professional Invoice |
+|:---:|:---:|
+| ![Invoice comparison]({{ site.baseurl }}/assets/images/fidelity-invoice-pdf.png){: .rounded .shadow } | ![Example invoice]({{ site.baseurl }}/assets/images/10-invoice.png){: .rounded .shadow } |
+| Fidelity test fixture ([PDF]({{ site.baseurl }}/assets/pdfs/10-invoice.pdf)) | [Example walkthrough]({{ site.baseurl }}/examples/invoice) |
 
 ---
 
