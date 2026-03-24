@@ -1,6 +1,6 @@
-# compose2pdf
+# Compose 2 PDF
 
-[![CI](https://github.com/chrisjenx/Compose2PDF/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisjenx/Compose2PDF/actions/workflows/ci.yml)
+[![CI](https://github.com/chrisjenx/compose2pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisjenx/compose2pdf/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 Render [Compose Desktop](https://www.jetbrains.com/compose-multiplatform/) content directly to PDF.
