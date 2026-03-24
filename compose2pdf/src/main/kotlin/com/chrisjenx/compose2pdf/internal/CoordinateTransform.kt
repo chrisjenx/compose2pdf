@@ -33,6 +33,34 @@ internal object CoordinateTransform {
         Matrix(java.awt.geom.AffineTransform(1.0, 0.0, 0.0, -1.0, x.toDouble(), (y + height).toDouble()))
 
     /**
+     * Creates the transform matrix for rendering SVG content within a page's content area
+     * with support for vertical pagination offset.
+     *
+     * Handles Y-flip, pixel-to-point scaling, margin positioning, and page offset.
+     * SVG pixel (px, py) maps to PDF point:
+     *   pdfX = scale * px + marginLeft
+     *   pdfY = -scale * py + (pageHeight - marginTop + verticalOffsetPt)
+     *
+     * @param scale Conversion factor from SVG pixels to PDF points (typically 1/density).
+     * @param marginLeft Left margin in PDF points.
+     * @param marginTop Top margin in PDF points.
+     * @param pageHeight Full page height in PDF points.
+     * @param verticalOffsetPt Vertical offset for pagination (pageIndex * contentHeightPt).
+     */
+    fun contentAreaMatrix(
+        scale: Float,
+        marginLeft: Float,
+        marginTop: Float,
+        pageHeight: Float,
+        verticalOffsetPt: Float = 0f,
+    ): Matrix = Matrix(
+        scale, 0f,
+        0f, -scale,
+        marginLeft,
+        pageHeight - marginTop + verticalOffsetPt,
+    )
+
+    /**
      * Converts a rectangle from Compose/SVG coordinates (Y-down from content origin)
      * to PDF coordinates (Y-up from page origin) for link annotations.
      */

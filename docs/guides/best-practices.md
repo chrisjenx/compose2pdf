@@ -107,9 +107,26 @@ renderToPdf(pages = 5) { pageIndex ->
 
 ---
 
-## Manage page breaks manually
+## Use auto-pagination for flowing content
 
-Compose does not auto-paginate content. You are responsible for deciding what goes on each page:
+By default, `renderToPdf` automatically splits content across pages. Place content items as direct children for best results:
+
+```kotlin
+renderToPdf(config = PdfPageConfig.A4WithMargins) {
+    // Each direct child is a "keep-together" unit
+    ReportHeader()
+    DataTable(items)       // won't be split across pages
+    SummarySection()       // pushed to next page if needed
+}
+```
+
+Avoid wrapping everything in a single `Column` — the library can only keep **direct children** together. Content using `fillMaxHeight()` or `Modifier.weight()` won't auto-paginate well.
+
+---
+
+## Use manual pagination for fixed layouts
+
+When you need full control (headers/footers, page numbers, page-specific content), use the manual multi-page API:
 
 ```kotlin
 val itemsPerPage = 20

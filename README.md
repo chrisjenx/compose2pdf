@@ -26,7 +26,8 @@ File("hello.pdf").writeBytes(pdfBytes)
 - **Raster fallback** — pixel-perfect rendering as an embedded image
 - **Font embedding** — bundled Inter fonts or system font resolution with automatic subsetting
 - **Link annotations** — clickable URLs in the PDF via `PdfLink`
-- **Multi-page** — render multiple pages in a single PDF
+- **Auto-pagination** — content automatically flows across pages; elements are kept together at page boundaries
+- **Multi-page** — render multiple pages in a single PDF (manual or automatic)
 - **Page presets** — A4, Letter, A3 with configurable margins and landscape support
 
 ## Installation
@@ -56,7 +57,21 @@ val pdf = renderToPdf(
 }
 ```
 
-### Multi-page
+### Auto-pagination (default)
+
+Content automatically flows across pages. Direct children are kept together — if a child would straddle a page boundary, it's pushed to the next page.
+
+```kotlin
+val pdf = renderToPdf(config = PdfPageConfig.A4WithMargins) {
+    ReportHeader()
+    DataTable(items)       // kept together on one page
+    SummarySection()       // pushed to next page if needed
+}
+```
+
+### Manual multi-page
+
+For full control over what goes on each page:
 
 ```kotlin
 val pdf = renderToPdf(pages = 3) { pageIndex ->

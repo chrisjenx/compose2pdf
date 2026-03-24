@@ -8,6 +8,9 @@ nav_order: 1
 
 The simplest way to create a PDF -- call `renderToPdf` with a composable lambda.
 
+{: .note }
+`renderToPdf` now **auto-paginates by default**. If your content overflows a single page, it automatically flows to additional pages. To force single-page behavior (clip overflow), pass `pagination = PdfPagination.SINGLE_PAGE`.
+
 ---
 
 ## Basic usage
@@ -21,7 +24,7 @@ val pdfBytes = renderToPdf {
 File("output.pdf").writeBytes(pdfBytes)
 ```
 
-This renders an A4 page in vector mode with the bundled Inter font.
+This renders an A4 page in vector mode with the bundled Inter font. If the content fits on one page, you get a single-page PDF.
 
 ---
 
@@ -29,10 +32,11 @@ This renders an A4 page in vector mode with the bundled Inter font.
 
 ```kotlin
 val pdfBytes = renderToPdf(
-    config = PdfPageConfig.A4,          // Page size and margins
-    density = Density(2f),              // Pixel resolution for layout
-    mode = RenderMode.VECTOR,           // Vector or raster rendering
-    defaultFontFamily = InterFontFamily // Font family for text
+    config = PdfPageConfig.A4,              // Page size and margins
+    density = Density(2f),                  // Pixel resolution for layout
+    mode = RenderMode.VECTOR,               // Vector or raster rendering
+    defaultFontFamily = InterFontFamily,    // Font family for text
+    pagination = PdfPagination.AUTO,        // Auto-paginate or single page
 ) {
     // Your composable content
 }
@@ -44,6 +48,7 @@ val pdfBytes = renderToPdf(
 | `density` | `Density` | `Density(2f)` | Pixel density for Compose layout. Higher = better anti-aliasing, more memory |
 | `mode` | `RenderMode` | `RenderMode.VECTOR` | `VECTOR` for selectable text, `RASTER` for pixel-perfect |
 | `defaultFontFamily` | `FontFamily?` | `InterFontFamily` | Default font. Pass `null` for system fonts |
+| `pagination` | `PdfPagination` | `PdfPagination.AUTO` | `AUTO` splits content across pages. `SINGLE_PAGE` clips to one page |
 | `content` | `@Composable () -> Unit` | -- | The content to render |
 
 **Returns:** `ByteArray` containing a valid PDF document.

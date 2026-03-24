@@ -6,11 +6,11 @@ nav_order: 1
 
 # renderToPdf
 
-The primary entry point for PDF generation. Two overloads: single-page and multi-page.
+The primary entry point for PDF generation. Two overloads: auto-paginating (default) and manual multi-page.
 
 ---
 
-## Single page
+## Auto-paginating (default)
 
 ```kotlin
 fun renderToPdf(
@@ -18,11 +18,14 @@ fun renderToPdf(
     density: Density = Density(2f),
     mode: RenderMode = RenderMode.VECTOR,
     defaultFontFamily: FontFamily? = InterFontFamily,
+    pagination: PdfPagination = PdfPagination.AUTO,
     content: @Composable () -> Unit,
 ): ByteArray
 ```
 
-Renders a single page of Compose content to a PDF.
+Renders Compose content to a PDF, automatically splitting across pages when content overflows.
+
+With `PdfPagination.AUTO` (the default), direct children of `content` are treated as "keep-together" units — if a child would straddle a page boundary, it is pushed to the next page. A single child taller than a page flows continuously across pages.
 
 ### Parameters
 
@@ -32,11 +35,12 @@ Renders a single page of Compose content to a PDF.
 | `density` | `Density` | `Density(2f)` | Pixel resolution for Compose layout. Each PDF point maps to `density` x `density` pixels. Higher values improve anti-aliasing (especially for raster mode) at the cost of memory |
 | `mode` | [`RenderMode`]({{ site.baseurl }}/api/render-mode) | `RenderMode.VECTOR` | Vector (SVG-based) or raster rendering |
 | `defaultFontFamily` | `FontFamily?` | [`InterFontFamily`]({{ site.baseurl }}/api/fonts) | Font family for the default text style. When non-null, content is wrapped so both Compose and PDFBox use the same font. Pass `null` for system fonts |
+| `pagination` | `PdfPagination` | `PdfPagination.AUTO` | Controls page splitting. `AUTO` automatically paginates. `SINGLE_PAGE` clips to one page |
 | `content` | `@Composable () -> Unit` | -- | The composable content to render |
 
 ### Returns
 
-`ByteArray` -- a valid PDF document.
+`ByteArray` -- a valid PDF document (one or more pages).
 
 ### Throws
 
@@ -52,12 +56,12 @@ val pdfBytes = renderToPdf(
     config = PdfPageConfig.LetterWithMargins,
     mode = RenderMode.VECTOR,
 ) {
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text("Invoice #1234", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("Amount: $1,250.00")
-    }
+    // Direct children are "keep-together" units
+    ReportHeader()
+    DataTable(items)       // kept together on one page
+    SummarySection()       // pushed to next page if needed
 }
-File("invoice.pdf").writeBytes(pdfBytes)
+File("report.pdf").writeBytes(pdfBytes)
 ```
 
 ---

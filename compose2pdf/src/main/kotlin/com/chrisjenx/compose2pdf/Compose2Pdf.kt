@@ -11,7 +11,12 @@ import com.chrisjenx.compose2pdf.internal.PdfRenderer
 class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 /**
- * Renders a single page of Compose content to a PDF.
+ * Renders Compose content to a PDF, automatically paginating when content overflows.
+ *
+ * With [PdfPagination.AUTO] (the default), content is automatically split across multiple
+ * pages. Direct children of [content] are treated as "keep-together" units — if a child
+ * would straddle a page boundary, it is pushed to the next page. For best results, place
+ * content items as direct children rather than wrapping in a single `Column`.
  *
  * @param config Page size and margins. Defaults to A4.
  * @param density Controls the pixel resolution used during Compose layout. A density of 2f means
@@ -23,6 +28,8 @@ class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeE
  *   When non-null, content is wrapped in the given font family so both Compose and PDFBox use
  *   the same font, eliminating rendering mismatch. Defaults to [InterFontFamily] (bundled Inter).
  *   Pass null to use system fonts instead, or supply your own [FontFamily].
+ * @param pagination Controls page splitting. [PdfPagination.AUTO] automatically paginates
+ *   overflowing content. [PdfPagination.SINGLE_PAGE] clips to a single page.
  * @param content The composable content to render.
  * @return A valid PDF as a ByteArray.
  * @throws Compose2PdfException if rendering fails.
@@ -35,16 +42,17 @@ fun renderToPdf(
     density: Density = Density(2f),
     mode: RenderMode = RenderMode.VECTOR,
     defaultFontFamily: FontFamily? = InterFontFamily,
+    pagination: PdfPagination = PdfPagination.AUTO,
     content: @Composable () -> Unit,
 ): ByteArray {
     try {
-        return PdfRenderer.renderSinglePage(config, density, mode, defaultFontFamily, content)
+        return PdfRenderer.renderSinglePage(config, density, mode, defaultFontFamily, pagination, content)
     } catch (e: Compose2PdfException) {
         throw e
     } catch (e: IllegalArgumentException) {
         throw e // Don't wrap precondition failures
     } catch (e: Exception) {
-        throw Compose2PdfException("Failed to render single-page PDF: ${e.message}", e)
+        throw Compose2PdfException("Failed to render PDF: ${e.message}", e)
     }
 }
 

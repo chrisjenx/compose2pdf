@@ -34,10 +34,7 @@ internal object SvgToPdfConverter {
         fontCache: MutableMap<String, PDFont> = mutableMapOf(),
         imageCache: MutableMap<String, PDImageXObject> = mutableMapOf(),
     ) {
-        val factory = DocumentBuilderFactory.newInstance()
-        factory.isNamespaceAware = true
-        val xmlDoc = factory.newDocumentBuilder().parse(svg.byteInputStream())
-        val svgRoot = xmlDoc.documentElement
+        val (svgRoot, defs) = parseSvg(svg)
 
         val svgWidth = svgRoot.getAttribute("width").toFloatOrNull() ?: pageWidthPt
         val svgHeight = svgRoot.getAttribute("height").toFloatOrNull() ?: pageHeightPt
@@ -48,9 +45,6 @@ internal object SvgToPdfConverter {
         val page = PDPage(mediaBox)
         pdfDoc.addPage(page)
 
-        val defs = mutableMapOf<String, Element>()
-        collectDefs(svgRoot, defs)
-
         val cs = PDPageContentStream(pdfDoc, page)
         try {
             // PDF: bottom-left origin. SVG: top-left. Flip Y and scale.
@@ -59,6 +53,75 @@ internal object SvgToPdfConverter {
         } finally {
             cs.close()
         }
+    }
+
+    /**
+     * Adds auto-paginated pages from a tall SVG, slicing vertically with proper
+     * margins, clipping, and page offsets.
+     *
+     * Parses the SVG once and renders each page slice, up to [maxPages].
+     */
+    fun addAutoPages(
+        pdfDoc: PDDocument,
+        svg: String,
+        layout: PageLayout,
+        totalContentHeightPt: Float,
+        density: Float,
+        maxPages: Int,
+        fontCache: MutableMap<String, PDFont>,
+        imageCache: MutableMap<String, PDImageXObject>,
+    ) {
+        val (svgRoot, defs) = parseSvg(svg)
+        val pageCount = kotlin.math.ceil(totalContentHeightPt.toDouble() / layout.contentHeightPt)
+            .toInt().coerceIn(1, maxPages)
+
+        for (pageIndex in 0 until pageCount) {
+            addPageSlice(pdfDoc, svgRoot, defs, layout, pageIndex, density, fontCache, imageCache)
+        }
+    }
+
+    private fun addPageSlice(
+        pdfDoc: PDDocument,
+        svgRoot: Element,
+        defs: Map<String, Element>,
+        layout: PageLayout,
+        pageIndex: Int,
+        density: Float,
+        fontCache: MutableMap<String, PDFont>,
+        imageCache: MutableMap<String, PDImageXObject>,
+    ) {
+        val mediaBox = PDRectangle(layout.pageWidthPt, layout.pageHeightPt)
+        val page = PDPage(mediaBox)
+        pdfDoc.addPage(page)
+
+        val cs = PDPageContentStream(pdfDoc, page)
+        try {
+            val marginBottom = layout.pageHeightPt - layout.marginTopPt - layout.contentHeightPt
+            cs.addRect(layout.marginLeftPt, marginBottom, layout.contentWidthPt, layout.contentHeightPt)
+            cs.clip()
+
+            val scale = 1f / density
+            val verticalOffsetPt = pageIndex * layout.contentHeightPt
+            cs.transform(
+                CoordinateTransform.contentAreaMatrix(
+                    scale, layout.marginLeftPt, layout.marginTopPt, layout.pageHeightPt, verticalOffsetPt,
+                )
+            )
+
+            PageRenderer(cs, pdfDoc, defs, fontCache, imageCache).renderChildren(svgRoot)
+        } finally {
+            cs.close()
+        }
+    }
+
+    private fun parseSvg(svg: String): Pair<Element, Map<String, Element>> {
+        val factory = DocumentBuilderFactory.newInstance()
+        factory.isNamespaceAware = true
+        val xmlDoc = factory.newDocumentBuilder().parse(svg.byteInputStream())
+        val svgRoot = xmlDoc.documentElement
+        val defs = mutableMapOf<String, Element>()
+        collectDefs(svgRoot, defs)
+        return svgRoot to defs
     }
 
     private fun collectDefs(parent: Element, defs: MutableMap<String, Element>) {

@@ -6,11 +6,32 @@ nav_order: 2
 
 # Multi-page Documents
 
-Render multiple pages into a single PDF by specifying the page count upfront.
+Two approaches: **automatic pagination** (content flows across pages) or **manual pagination** (you control each page).
 
 ---
 
-## Basic usage
+## Auto-pagination (recommended)
+
+The simplest approach — just provide your content and it automatically flows across pages:
+
+```kotlin
+val pdf = renderToPdf(config = PdfPageConfig.A4WithMargins) {
+    ReportHeader()
+    DataTable(items)       // kept together — won't be split across pages
+    SummarySection()       // pushed to next page if needed
+}
+```
+
+Direct children of the content block are treated as "keep-together" units. If a child would straddle a page boundary, it is pushed to the next page. A single child taller than a page flows continuously across pages.
+
+{: .note }
+For best page breaking, place content items as **direct children** rather than wrapping in a single `Column`. Direct children are what the library measures for page-break decisions.
+
+---
+
+## Manual pagination
+
+For full control over what goes on each page, specify the page count upfront:
 
 ```kotlin
 val pdf = renderToPdf(pages = 3) { pageIndex ->
@@ -131,13 +152,21 @@ val pdf = renderToPdf(
 
 ---
 
-{: .note }
-Compose does **not** auto-paginate content. There is no automatic "flow content to next page" -- you must manage page breaks yourself by deciding what content goes on each page.
+---
+
+## When to use which
+
+| | Auto-pagination | Manual pagination |
+|:--|:----------------|:------------------|
+| **Best for** | Flowing content (reports, lists, articles) | Fixed-layout pages (cover + data + summary) |
+| **Page breaks** | Automatic — elements kept together | You decide what goes on each page |
+| **Headers/footers** | Not supported (each page has different content) | Use `Spacer(Modifier.weight(1f))` pattern |
+| **`fillMaxHeight()`** | Falls back to single page | Works as expected |
 
 ---
 
 ## See also
 
-- [API Reference: renderToPdf]({{ site.baseurl }}/api/render-to-pdf) -- Full multi-page signature
-- [Example: Multi-page Report]({{ site.baseurl }}/examples/report) -- Complete walkthrough
+- [API Reference: renderToPdf]({{ site.baseurl }}/api/render-to-pdf) -- Full API signatures
+- [Example: Multi-page Report]({{ site.baseurl }}/examples/report) -- Manual pagination walkthrough
 - [Layout]({{ site.baseurl }}/usage/layout) -- Using weights and spacers for page structure
