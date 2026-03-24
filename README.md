@@ -1,6 +1,6 @@
 # compose2pdf
 
-[![CI](https://github.com/nickhall-ck/compose2pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/nickhall-ck/compose2pdf/actions/workflows/ci.yml)
+[![CI](https://github.com/chrisjenx/compose2pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisjenx/compose2pdf/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 Render [Compose Desktop](https://www.jetbrains.com/compose-multiplatform/) content directly to PDF.
@@ -68,13 +68,13 @@ PdfLink(href = "https://example.com") {
 
 ## Documentation
 
-**[Full documentation](https://nickhall-ck.github.io/compose2pdf/)** — getting started, usage guides, API reference, examples, and more.
+**[Full documentation](https://chrisjenx.github.io/compose2pdf/)** — getting started, usage guides, API reference, examples, and more.
 
-- [Getting Started](https://nickhall-ck.github.io/compose2pdf/getting-started)
-- [Usage Guide](https://nickhall-ck.github.io/compose2pdf/usage/)
-- [API Reference](https://nickhall-ck.github.io/compose2pdf/api/)
-- [Examples](https://nickhall-ck.github.io/compose2pdf/examples/)
-- [Troubleshooting](https://nickhall-ck.github.io/compose2pdf/guides/troubleshooting)
+- [Getting Started](https://chrisjenx.github.io/compose2pdf/getting-started)
+- [Usage Guide](https://chrisjenx.github.io/compose2pdf/usage/)
+- [API Reference](https://chrisjenx.github.io/compose2pdf/api/)
+- [Examples](https://chrisjenx.github.io/compose2pdf/examples/)
+- [Troubleshooting](https://chrisjenx.github.io/compose2pdf/guides/troubleshooting)
 
 ## License
 

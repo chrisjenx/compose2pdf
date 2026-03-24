@@ -2,11 +2,11 @@ title: compose2pdf
 description: Render Compose Desktop content directly to PDF
 remote_theme: just-the-docs/just-the-docs@v0.10.0
 
-url: "https://nickhall-ck.github.io"
+url: "https://chrisjenx.github.io"
 baseurl: "/compose2pdf"
 
 aux_links:
-  GitHub: https://github.com/nickhall-ck/compose2pdf
+  GitHub: https://github.com/chrisjenx/compose2pdf
 
 aux_links_new_tab: true
 
