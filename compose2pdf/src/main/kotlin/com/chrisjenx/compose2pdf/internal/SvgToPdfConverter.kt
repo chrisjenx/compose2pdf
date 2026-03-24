@@ -359,7 +359,7 @@ internal object SvgToPdfConverter {
 
             if (hasStroke) {
                 applyStrokeState(elem)
-                SvgColorParser.parse(stroke!!)?.let { c -> cs.setStrokingColor(c.r, c.g, c.b) }
+                SvgColorParser.parse(stroke)?.let { c -> cs.setStrokingColor(c.r, c.g, c.b) }
             }
 
             val evenOdd = attr(elem, "fill-rule") == "evenodd"
