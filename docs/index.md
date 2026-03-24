@@ -23,6 +23,9 @@ File("hello.pdf").writeBytes(pdfBytes)
 
 That's it. Three lines to go from Compose to PDF.
 
+![Hello PDF example]({{ site.baseurl }}/assets/images/01-hello.png){: .rounded .shadow .mb-4 }
+*Output of the code above — vector text on an A4 page ([download PDF]({{ site.baseurl }}/assets/pdfs/01-hello.pdf))*
+
 ---
 
 ## Why compose2pdf?

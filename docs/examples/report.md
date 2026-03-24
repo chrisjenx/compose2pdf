@@ -10,6 +10,16 @@ A 3-page quarterly report demonstrating multi-page documents with shared headers
 
 ---
 
+## The result
+
+| Page 1: Cover | Page 2: Data | Page 3: Summary |
+|:---:|:---:|:---:|
+| ![Page 1]({{ site.baseurl }}/assets/images/08-multi-page-1.png){: .rounded .shadow } | ![Page 2]({{ site.baseurl }}/assets/images/08-multi-page-2.png){: .rounded .shadow } | ![Page 3]({{ site.baseurl }}/assets/images/08-multi-page-3.png){: .rounded .shadow } |
+
+[Download PDF]({{ site.baseurl }}/assets/pdfs/08-multi-page.pdf){: .btn .btn-outline .fs-3 }
+
+---
+
 ## Entry point
 
 ```kotlin

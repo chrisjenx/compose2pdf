@@ -27,6 +27,11 @@ val pdf = renderToPdf(config = PdfPageConfig.A4WithMargins) {
 }
 ```
 
+| A4 (default) | Letter with margins | A3 landscape |
+|:---:|:---:|:---:|
+| ![A4]({{ site.baseurl }}/assets/images/02-a4-default.png){: .rounded .shadow } | ![Letter]({{ site.baseurl }}/assets/images/02-letter-with-margins.png){: .rounded .shadow } | ![A3 landscape]({{ site.baseurl }}/assets/images/02-a3-landscape.png){: .rounded .shadow } |
+| [PDF]({{ site.baseurl }}/assets/pdfs/02-a4-default.pdf) | [PDF]({{ site.baseurl }}/assets/pdfs/02-letter-with-margins.pdf) | [PDF]({{ site.baseurl }}/assets/pdfs/02-a3-landscape.pdf) |
+
 {: .tip }
 Compose `Dp` and PDF points are the same unit: 1/72 of an inch. A value of `72.dp` equals exactly 1 inch in the PDF. No conversion needed.
 

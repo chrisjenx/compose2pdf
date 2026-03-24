@@ -12,6 +12,10 @@ A complete, real-world invoice demonstrating layout, shapes, text styling, links
 
 ## The result
 
+![Professional invoice output]({{ site.baseurl }}/assets/images/10-invoice.png){: .rounded .shadow }
+
+[Download PDF]({{ site.baseurl }}/assets/pdfs/10-invoice.pdf){: .btn .btn-outline .fs-3 }
+
 This example generates a US Letter-sized PDF with:
 - Company branding header with navy background
 - FROM / BILL TO address columns

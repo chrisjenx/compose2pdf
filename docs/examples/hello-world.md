@@ -84,13 +84,15 @@ File("hello.pdf").writeBytes(pdfBytes)
 
 ---
 
-## What the output looks like
+## Output
 
-- A single A4 page
-- "Hello, PDF!" in 28sp black text at the top-left (with 32dp padding)
-- "Generated with compose2pdf" in 14sp gray text below
+![Hello PDF output]({{ site.baseurl }}/assets/images/01-hello.png){: .rounded .shadow }
+
+[Download PDF]({{ site.baseurl }}/assets/pdfs/01-hello.pdf){: .btn .btn-outline .fs-3 }
+
+- A single A4 page with vector text
 - Text is selectable in any PDF viewer
-- File size: typically 15-25 KB
+- File size: ~8 KB
 
 ---
 

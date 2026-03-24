@@ -10,6 +10,11 @@ Use backgrounds, borders, clips, and Canvas drawing to create rich PDF content.
 
 ---
 
+![Shapes and drawing example]({{ site.baseurl }}/assets/images/05-shapes-and-drawing.png){: .rounded .shadow .mb-4 }
+*Shapes and drawing example — [download PDF]({{ site.baseurl }}/assets/pdfs/05-shapes-and-drawing.pdf)*
+
+---
+
 ## Backgrounds
 
 ```kotlin

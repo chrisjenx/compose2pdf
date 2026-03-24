@@ -10,6 +10,11 @@ All standard Compose layout composables work in PDF rendering. Design your pages
 
 ---
 
+![Layout example]({{ site.baseurl }}/assets/images/04-layout-basics.png){: .rounded .shadow .mb-4 }
+*Layout example — [download PDF]({{ site.baseurl }}/assets/pdfs/04-layout-basics.pdf)*
+
+---
+
 ## Column
 
 Stack content vertically:

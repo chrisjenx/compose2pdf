@@ -10,6 +10,11 @@ Embed bitmap images in your PDF with standard Compose `Image` composables.
 
 ---
 
+![Images example]({{ site.baseurl }}/assets/images/06-images.png){: .rounded .shadow .mb-4 }
+*Images in PDF example — [download PDF]({{ site.baseurl }}/assets/pdfs/06-images.pdf)*
+
+---
+
 ## Basic image
 
 ```kotlin

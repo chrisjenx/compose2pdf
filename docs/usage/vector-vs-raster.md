@@ -10,6 +10,13 @@ compose2pdf supports two rendering modes. Choose the right one for your use case
 
 ---
 
+| Vector mode | Raster mode |
+|:---:|:---:|
+| ![Vector]({{ site.baseurl }}/assets/images/09-vector-mode.png){: .rounded .shadow } | ![Raster]({{ site.baseurl }}/assets/images/09-raster-mode.png){: .rounded .shadow } |
+| [Download PDF]({{ site.baseurl }}/assets/pdfs/09-vector-mode.pdf) (11 KB) | [Download PDF]({{ site.baseurl }}/assets/pdfs/09-raster-mode.pdf) (70 KB) |
+
+---
+
 ## Comparison
 
 | Feature | VECTOR | RASTER |

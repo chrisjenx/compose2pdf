@@ -10,6 +10,11 @@ Add clickable URLs to your PDFs with the `PdfLink` composable.
 
 ---
 
+![Links example]({{ site.baseurl }}/assets/images/07-links.png){: .rounded .shadow .mb-4 }
+*PDF link annotations example — [download PDF]({{ site.baseurl }}/assets/pdfs/07-links.pdf)*
+
+---
+
 ## Basic text link
 
 ```kotlin

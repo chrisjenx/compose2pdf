@@ -10,6 +10,11 @@ compose2pdf supports rich text styling through standard Compose text APIs, with 
 
 ---
 
+![Text styling example]({{ site.baseurl }}/assets/images/03-text-styling.png){: .rounded .shadow .mb-4 }
+*Text styling example — [download PDF]({{ site.baseurl }}/assets/pdfs/03-text-styling.pdf)*
+
+---
+
 ## Basic text styling
 
 ```kotlin

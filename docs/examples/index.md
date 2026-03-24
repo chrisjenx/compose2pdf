@@ -27,6 +27,44 @@ Complete code examples demonstrating compose2pdf features. All examples are runn
 
 ---
 
+---
+
+## Preview
+
+| Hello World | Text Styling | Layout |
+|:---:|:---:|:---:|
+| [![Hello]({{ site.baseurl }}/assets/images/01-hello.png){: .rounded .shadow }]({{ site.baseurl }}/examples/hello-world) | ![Text]({{ site.baseurl }}/assets/images/03-text-styling.png){: .rounded .shadow } | ![Layout]({{ site.baseurl }}/assets/images/04-layout-basics.png){: .rounded .shadow } |
+
+| Shapes & Drawing | Images | Links |
+|:---:|:---:|:---:|
+| ![Shapes]({{ site.baseurl }}/assets/images/05-shapes-and-drawing.png){: .rounded .shadow } | ![Images]({{ site.baseurl }}/assets/images/06-images.png){: .rounded .shadow } | ![Links]({{ site.baseurl }}/assets/images/07-links.png){: .rounded .shadow } |
+
+| Multi-page Report | Professional Invoice |
+|:---:|:---:|
+| [![Report]({{ site.baseurl }}/assets/images/08-multi-page-1.png){: .rounded .shadow }]({{ site.baseurl }}/examples/report) | [![Invoice]({{ site.baseurl }}/assets/images/10-invoice.png){: .rounded .shadow }]({{ site.baseurl }}/examples/invoice) |
+
+---
+
+## Download PDFs
+
+| Example | PDF |
+|:--------|:----|
+| Hello World | [01-hello.pdf]({{ site.baseurl }}/assets/pdfs/01-hello.pdf) |
+| Page Configuration (A4) | [02-a4-default.pdf]({{ site.baseurl }}/assets/pdfs/02-a4-default.pdf) |
+| Page Configuration (Letter) | [02-letter-with-margins.pdf]({{ site.baseurl }}/assets/pdfs/02-letter-with-margins.pdf) |
+| Page Configuration (A3 Landscape) | [02-a3-landscape.pdf]({{ site.baseurl }}/assets/pdfs/02-a3-landscape.pdf) |
+| Text Styling | [03-text-styling.pdf]({{ site.baseurl }}/assets/pdfs/03-text-styling.pdf) |
+| Layout Basics | [04-layout-basics.pdf]({{ site.baseurl }}/assets/pdfs/04-layout-basics.pdf) |
+| Shapes & Drawing | [05-shapes-and-drawing.pdf]({{ site.baseurl }}/assets/pdfs/05-shapes-and-drawing.pdf) |
+| Images | [06-images.pdf]({{ site.baseurl }}/assets/pdfs/06-images.pdf) |
+| Links | [07-links.pdf]({{ site.baseurl }}/assets/pdfs/07-links.pdf) |
+| Multi-page Report | [08-multi-page.pdf]({{ site.baseurl }}/assets/pdfs/08-multi-page.pdf) |
+| Vector Mode | [09-vector-mode.pdf]({{ site.baseurl }}/assets/pdfs/09-vector-mode.pdf) |
+| Raster Mode | [09-raster-mode.pdf]({{ site.baseurl }}/assets/pdfs/09-raster-mode.pdf) |
+| Professional Invoice | [10-invoice.pdf]({{ site.baseurl }}/assets/pdfs/10-invoice.pdf) |
+
+---
+
 ## Quick links
 
 - [Hello World]({{ site.baseurl }}/examples/hello-world) -- Start here
