@@ -27,8 +27,6 @@ Complete code examples demonstrating compose2pdf features. All examples are runn
 
 ---
 
----
-
 ## Preview
 
 | Hello World | Text Styling | Layout |

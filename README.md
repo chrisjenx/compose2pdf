@@ -78,11 +78,11 @@ PdfLink(href = "https://example.com") {
 
 **[Full documentation](https://chrisjenx.github.io/compose2pdf/)** — getting started, usage guides, API reference, examples, and more.
 
-- [Getting Started](https://chrisjenx.github.io/compose2pdf/getting-started)
+- [Getting Started](https://chrisjenx.github.io/compose2pdf/getting-started/)
 - [Usage Guide](https://chrisjenx.github.io/compose2pdf/usage/)
 - [API Reference](https://chrisjenx.github.io/compose2pdf/api/)
 - [Examples](https://chrisjenx.github.io/compose2pdf/examples/)
-- [Troubleshooting](https://chrisjenx.github.io/compose2pdf/guides/troubleshooting)
+- [Troubleshooting](https://chrisjenx.github.io/compose2pdf/guides/troubleshooting/)
 
 ## License
 

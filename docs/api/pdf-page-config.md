@@ -54,7 +54,7 @@ Compose `Dp` and PDF points are identical: both equal 1/72 of an inch. A value o
 fun landscape(): PdfPageConfig
 ```
 
-Returns a landscape version with width and height swapped. Margins are rotated accordingly (top becomes left, right becomes top, etc.).
+Returns a landscape version with width and height swapped. Margins are rotated 90 degrees (left becomes top, top becomes right, right becomes bottom, bottom becomes left).
 
 ```kotlin
 val landscape = PdfPageConfig.A4.landscape()
