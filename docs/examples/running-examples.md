@@ -13,7 +13,7 @@ The compose2pdf repository includes 10 runnable examples that generate PDFs, ras
 ## Quick start
 
 ```bash
-git clone https://github.com/chrisjenx/compose2pdf.git
+git clone https://github.com/chrisjenx/Compose2PDF.git
 cd compose2pdf
 ./gradlew :examples:run
 ```
