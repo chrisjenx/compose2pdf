@@ -8,6 +8,7 @@
 
 ```
 ├── compose2pdf/          # Library: public API + SVG→PDF converter + font resolver
+├── examples/             # Runnable examples (not published)
 └── fidelity-test/        # Visual regression tests (not published)
 ```
 
@@ -27,6 +28,7 @@
 ./gradlew :fidelity-test:test --rerun-tasks  # Force re-run (bypass Gradle cache)
 ./gradlew :compose2pdf:publishToMavenLocal  # Publish to ~/.m2
 ./gradlew :compose2pdf:compileKotlin        # Quick compile check (no tests)
+./gradlew :examples:run                     # Run examples, output to examples/build/output/
 open fidelity-test/build/reports/fidelity/index.html  # View fidelity report (macOS)
 ```
 
@@ -55,6 +57,16 @@ Shape.asPdfSafe()
 
 Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargins + `landscape()`), `PdfMargins` (None/Narrow/Normal + `symmetric()`), `PdfPagination` (AUTO/SINGLE_PAGE), `Density`, `RenderMode` (VECTOR/RASTER), `InterFontFamily`, `Compose2PdfException`.
 
+## Key Files
+
+- `compose2pdf/src/main/kotlin/.../Compose2Pdf.kt` — Public API entry points
+- `compose2pdf/src/main/kotlin/.../internal/PdfRenderer.kt` — Rendering orchestrator (vector, raster, auto-pagination)
+- `compose2pdf/src/main/kotlin/.../internal/ComposeToSvg.kt` — Compose → SVG + measurement
+- `compose2pdf/src/main/kotlin/.../internal/SvgToPdfConverter.kt` — SVG → PDF pages
+- `compose2pdf/src/main/kotlin/.../internal/PaginatedColumn.kt` — Smart page-break layout
+- `compose2pdf/src/main/kotlin/.../internal/FontResolver.kt` — Font resolution + subsetting
+- `fidelity-test/src/test/.../FidelityFixtures.kt` — All fidelity test composables
+
 ## Architecture
 
 ```
@@ -67,25 +79,37 @@ Compose content → ComposeToSvg.render() → SVG string
   → PDFBox vector drawing commands → ByteArray (PDF)
 
 Raster fallback: ImageComposeScene → bitmap → PDFBox embedded image
+
+Auto-pagination: PaginatedColumn (smart page breaks)
+  → ComposeToSvg.measureContentHeight() (lightweight measurement)
+  → ComposeToSvg.renderWithMeasurement() (full SVG + height)
+  → SvgToPdfConverter.addAutoPages() (clip + offset per page)
 ```
 
 ## Gotchas
 
+### Rendering
 - **`@InternalComposeUiApi` opt-in required** — `CanvasLayersComposeScene` is internal Compose API
 - **Variable fonts excluded** — `FontResolver.isVariableFont()` skips fonts with `fvar` table
 - **SVGCanvas bezier approximation** — non-uniform rounded rects become complex bezier paths; use `PdfRoundedCornerShape`
 - **Bundled fonts loaded from classpath** — `FontResolver` loads Inter fonts directly from `InputStream`, no temp files
 - **`Compose2PdfException` wraps rendering errors** — `IllegalArgumentException` (precondition failures) passes through unwrapped
-- **Auto-pagination measures in tall scene** — `PdfRenderer` uses a 200K px max scene height for measurement; Compose `Constraints` limit is ~262K px
-- **Auto-pagination fallback** — If measured height ≤ page height or ≥ max height (fillMaxHeight detected), falls back to original single-page rendering path for identical output
+
+### Auto-pagination
+- **Measures in tall scene** — `PdfRenderer` uses a 200K px max scene height for measurement; Compose `Constraints` limit is ~262K px
+- **Falls back for single-page content** — If measured height ≤ page height or ≥ max height (fillMaxHeight detected), falls back to original single-page rendering path for identical output
 - **PaginatedColumn keeps children together** — Inserts padding at page boundaries so no direct child is split; oversized children (taller than a page) flow across pages
+
+### Testing
+- **Fidelity tests assume identical render path** — Changing `renderToPdf` default behavior (e.g., wrapping content in extra layout layers or using a taller scene) can break fidelity comparisons; single-page content must fall back to the original render path
+- **Compose `Placeable` is not fakeable** — `width`/`height` are final; test layout logic with raw `List<Int>` heights instead of mock `Placeable` objects
 
 ## Code Conventions
 
 - Package: `com.chrisjenx.compose2pdf`
 - Internal implementation in `com.chrisjenx.compose2pdf.internal`
 - `internal` visibility by default for implementation classes
-- Only `renderToPdf()`, `PdfLink()`, config types, `PdfRoundedCornerShape`, and `Shape.asPdfSafe()` are public — link collectors, annotations, and rendering internals are `internal`
+- Public API: `renderToPdf()`, `PdfLink()`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
 - Tests use `kotlin-test`
 
 ## Publishing
