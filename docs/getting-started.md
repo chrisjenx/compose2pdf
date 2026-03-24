@@ -106,5 +106,6 @@ val pdf = renderToPdf(
 - [Usage Guide]({{ site.baseurl }}/usage/) -- Learn about all the features
 - [Multi-page documents]({{ site.baseurl }}/usage/multi-page) -- Render multiple pages
 - [Page configuration]({{ site.baseurl }}/usage/page-configuration) -- Page sizes, margins, landscape
+- [Compatibility]({{ site.baseurl }}/compatibility) -- Supported Compose, JDK, and platform versions
 - [Examples]({{ site.baseurl }}/examples/) -- Real-world code examples
 - [API Reference]({{ site.baseurl }}/api/) -- Full API documentation

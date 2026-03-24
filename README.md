@@ -41,6 +41,28 @@ dependencies {
 
 Requires **JDK 17+** and **Compose Desktop** (Compose Multiplatform 1.9+).
 
+## Compatibility
+
+[![Compose Compatibility](https://github.com/chrisjenx/compose2pdf/actions/workflows/compatibility.yml/badge.svg)](https://github.com/chrisjenx/compose2pdf/actions/workflows/compatibility.yml)
+
+Tested weekly against the 3 most recent Compose Multiplatform releases:
+
+| Compose Multiplatform | Kotlin | Status |
+|:----------------------|:-------|:-------|
+| 1.11.0-alpha04 | 2.3.20 | CI tested |
+| **1.10.3** | 2.3.20 | CI tested (current) |
+| 1.9.3 | 2.3.20 | CI tested |
+
+**Platform support:**
+
+| | JDK 17+ | JDK 21+ |
+|:---|:-------:|:-------:|
+| **macOS** (arm64, x64) | Supported | Supported |
+| **Linux** (x64) | Supported | Supported |
+| **Windows** (x64) | Supported | Supported |
+
+> Compose Desktop is JVM-only. Android and iOS are not supported.
+
 ## Quick start
 
 ### Single page
@@ -97,6 +119,7 @@ PdfLink(href = "https://example.com") {
 - [Usage Guide](https://chrisjenx.github.io/compose2pdf/usage/)
 - [API Reference](https://chrisjenx.github.io/compose2pdf/api/)
 - [Examples](https://chrisjenx.github.io/compose2pdf/examples/)
+- [Compatibility](https://chrisjenx.github.io/compose2pdf/compatibility/)
 - [Troubleshooting](https://chrisjenx.github.io/compose2pdf/guides/troubleshooting/)
 
 ## License
