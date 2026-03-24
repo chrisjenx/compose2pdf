@@ -32,6 +32,8 @@ jobs:
     name: CMP ${{ matrix.version.compose-version }} / ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - uses: actions/setup-java@v4
         with:
