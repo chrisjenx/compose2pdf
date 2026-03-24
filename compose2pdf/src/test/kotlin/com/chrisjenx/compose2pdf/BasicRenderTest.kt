@@ -41,7 +41,7 @@ class BasicRenderTest {
 
     @Test
     fun `renderToPdf with margins`() {
-        val config = PdfPageConfig.A4.copy(margins = PdfMargins.Normal)
+        val config = PdfPageConfig.A4.copy(margins = PdfMargins.Narrow)
         val bytes = renderToPdf(config = config) {
             Text("Page with margins")
         }

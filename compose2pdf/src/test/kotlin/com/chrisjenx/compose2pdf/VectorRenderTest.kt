@@ -25,7 +25,7 @@ class VectorRenderTest {
 
     @Test
     fun `vector PDF contains selectable text`() {
-        val config = PdfPageConfig.A4.copy(margins = PdfMargins.Normal)
+        val config = PdfPageConfig.A4.copy(margins = PdfMargins.Narrow)
         val bytes = renderToPdf(config = config, mode = RenderMode.VECTOR) {
             Column(Modifier.fillMaxSize().padding(16.dp)) {
                 Text("Invoice #1234", fontSize = 28.sp, color = Color.Black)

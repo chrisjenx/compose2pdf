@@ -73,8 +73,8 @@ Box(Modifier.clip(PdfRoundedCornerShape(topStart = 24.dp, bottomEnd = 24.dp)))
 
 | Function / Type | Description |
 |---|---|
-| `renderToPdf(config, density, mode, useBundledFont) { content }` | Single page PDF |
-| `renderToPdf(pages, config, density, mode, useBundledFont) { pageIndex -> content }` | Multi-page PDF |
+| `renderToPdf(config, density, mode, defaultFontFamily) { content }` | Single page PDF |
+| `renderToPdf(pages, config, density, mode, defaultFontFamily) { pageIndex -> content }` | Multi-page PDF |
 | `PdfLink(href) { content }` | Clickable link annotation |
 | `PdfRoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)` | PDF-safe rounded corners |
 | `Shape.asPdfSafe()` | Wrap any shape for correct PDF rendering |

@@ -8,7 +8,7 @@ import com.chrisjenx.compose2pdf.internal.PdfRenderer
 /**
  * Exception thrown when PDF rendering fails.
  */
-class Compose2PdfException(message: String, cause: Throwable) : RuntimeException(message, cause)
+class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 /**
  * Renders a single page of Compose content to a PDF.
@@ -26,6 +26,9 @@ class Compose2PdfException(message: String, cause: Throwable) : RuntimeException
  * @param content The composable content to render.
  * @return A valid PDF as a ByteArray.
  * @throws Compose2PdfException if rendering fails.
+ *
+ * **Thread safety**: This function is not thread-safe. Concurrent calls should be
+ * serialized externally (e.g., via a mutex or single-threaded dispatcher).
  */
 fun renderToPdf(
     config: PdfPageConfig = PdfPageConfig.A4,
@@ -66,6 +69,9 @@ fun renderToPdf(
  * @return A valid PDF as a ByteArray.
  * @throws Compose2PdfException if rendering fails.
  * @throws IllegalArgumentException if [pages] is not positive.
+ *
+ * **Thread safety**: This function is not thread-safe. Concurrent calls should be
+ * serialized externally (e.g., via a mutex or single-threaded dispatcher).
  */
 fun renderToPdf(
     pages: Int,

@@ -31,7 +31,7 @@ internal data class PdfLinkAnnotation(
  * Set via [LocalPdfLinkCollector] during renderToPdf calls.
  */
 internal class PdfLinkCollector {
-    private val _links = java.util.concurrent.CopyOnWriteArrayList<PdfLinkAnnotation>()
+    private val _links = mutableListOf<PdfLinkAnnotation>()
     val links: List<PdfLinkAnnotation> get() = _links
 
     fun add(annotation: PdfLinkAnnotation) {
@@ -67,6 +67,7 @@ fun PdfLink(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    require(href.isNotBlank()) { "PdfLink href must not be blank" }
     val collector = LocalPdfLinkCollector.current
     val density = LocalDensity.current
 

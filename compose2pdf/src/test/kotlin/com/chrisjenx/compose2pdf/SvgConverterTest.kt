@@ -243,7 +243,7 @@ class SvgConverterTest {
 
     @Test
     fun `PDF link annotations are added to vector PDF`() {
-        val config = PdfPageConfig.A4.copy(margins = PdfMargins.Normal)
+        val config = PdfPageConfig.A4.copy(margins = PdfMargins.Narrow)
         val bytes = renderToPdf(config = config, mode = RenderMode.VECTOR) {
             Column(Modifier.fillMaxSize().padding(16.dp)) {
                 Text("Regular text", fontSize = 16.sp)
