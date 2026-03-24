@@ -29,8 +29,6 @@ import com.chrisjenx.compose2pdf.PdfPageConfig
 import com.chrisjenx.compose2pdf.RenderMode
 import com.chrisjenx.compose2pdf.renderToPdf
 import org.apache.pdfbox.Loader
-import org.apache.pdfbox.rendering.PDFRenderer
-import java.awt.RenderingHints
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -101,15 +99,6 @@ class MultipageTest {
 
             Loader.loadPDF(pdfBytes).use { doc ->
                 assertEquals(pageCount, doc.numberOfPages, "$mode: wrong page count")
-                val renderer = PDFRenderer(doc)
-                renderer.setRenderingHints(RenderingHints(mapOf(
-                    RenderingHints.KEY_ANTIALIASING to RenderingHints.VALUE_ANTIALIAS_ON,
-                    RenderingHints.KEY_TEXT_ANTIALIASING to RenderingHints.VALUE_TEXT_ANTIALIAS_ON,
-                    RenderingHints.KEY_FRACTIONALMETRICS to RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-                    RenderingHints.KEY_STROKE_CONTROL to RenderingHints.VALUE_STROKE_PURE,
-                    RenderingHints.KEY_RENDERING to RenderingHints.VALUE_RENDER_QUALITY,
-                    RenderingHints.KEY_INTERPOLATION to RenderingHints.VALUE_INTERPOLATION_BICUBIC,
-                )))
 
                 for (i in 0 until pageCount) {
                     val pageW = (config.width.value * density.density).toInt()
@@ -125,7 +114,7 @@ class MultipageTest {
                     val composeImage = compositeOnPage(contentImage, pageW, pageH, config, density)
                     saveImage(ImageMetrics.flattenOnWhite(composeImage), imagesDir, "multipage-$modeName-p${i}-compose.png")
 
-                    val pdfImage = renderer.renderImageWithDPI(i, renderDpi)
+                    val pdfImage = rasterizePdf(doc, renderDpi, page = i)
                     saveImage(pdfImage, imagesDir, "multipage-$modeName-p${i}-pdf.png")
 
                     val rmse = ImageMetrics.computeRmse(composeImage, pdfImage)

@@ -226,47 +226,131 @@ object ImageMetrics {
     }
 
     /**
-     * Generates a per-pixel heat map diff image.
-     * Gray (#EEEEEE) = identical pixels, green->yellow = small deltas, yellow->red = large deltas.
-     * Amplification factor makes subtle differences visible.
+     * Generates a per-pixel heat map diff image with tolerance-based dead zone.
+     *
+     * - Gray (#EEEEEE): within tolerance — anti-aliasing, subpixel, alpha noise
+     * - Blue → Cyan: minor differences above tolerance (amplified ≤ 0.5)
+     * - Yellow → Red: significant differences (amplified > 0.5) — real errors
+     *
+     * @param tolerance Per-channel tolerance (0–255). Pixels differing by at most this
+     *   on every RGB channel are treated as matching (gray).
+     * @param amplification Scale factor applied to differences above the tolerance floor.
      */
-    fun generateDiffImage(reference: BufferedImage, candidate: BufferedImage, amplification: Float = 10f): BufferedImage {
+    fun generateDiffImage(
+        reference: BufferedImage,
+        candidate: BufferedImage,
+        tolerance: Int = 4,
+        amplification: Float = 5f,
+    ): BufferedImage {
         val ref = flattenOnWhite(reference)
         val cand = flattenOnWhite(candidate)
         val w = minOf(ref.width, cand.width)
         val h = minOf(ref.height, cand.height)
         val result = BufferedImage(maxOf(w, 1), maxOf(h, 1), BufferedImage.TYPE_INT_RGB)
+        val toleranceNorm = tolerance / 255.0
+        val refPixels = ref.getRGB(0, 0, w, h, null, 0, w)
+        val candPixels = cand.getRGB(0, 0, w, h, null, 0, w)
+        val resultPixels = IntArray(w * h) { GRAY_RGB }
 
         for (y in 0 until h) {
             for (x in 0 until w) {
-                val refRgb = ref.getRGB(x, y)
-                val candRgb = cand.getRGB(x, y)
+                val idx = y * w + x
+                val refRgb = refPixels[idx]
+                val candRgb = candPixels[idx]
 
-                val dr = (((refRgb shr 16) and 0xFF) - ((candRgb shr 16) and 0xFF)) / 255.0
-                val dg = (((refRgb shr 8) and 0xFF) - ((candRgb shr 8) and 0xFF)) / 255.0
-                val db = ((refRgb and 0xFF) - (candRgb and 0xFF)) / 255.0
+                val drAbs = abs(((refRgb shr 16) and 0xFF) - ((candRgb shr 16) and 0xFF))
+                val dgAbs = abs(((refRgb shr 8) and 0xFF) - ((candRgb shr 8) and 0xFF))
+                val dbAbs = abs((refRgb and 0xFF) - (candRgb and 0xFF))
 
+                if (drAbs <= tolerance && dgAbs <= tolerance && dbAbs <= tolerance) continue
+
+                val dr = drAbs / 255.0
+                val dg = dgAbs / 255.0
+                val db = dbAbs / 255.0
                 val distance = sqrt((dr * dr + dg * dg + db * db) / 3.0)
-                val amplified = (distance * amplification).coerceIn(0.0, 1.0)
 
-                val rgb = if (amplified == 0.0) {
-                    (0xEE shl 16) or (0xEE shl 8) or 0xEE
-                } else if (amplified <= 0.5) {
-                    val t = amplified / 0.5
-                    val r = (t * 255).toInt().coerceIn(0, 255)
-                    val g = (204 + t * 51).toInt().coerceIn(0, 255)
-                    (r shl 16) or (g shl 8)
-                } else {
-                    val t = (amplified - 0.5) / 0.5
-                    val g = ((1.0 - t) * 255).toInt().coerceIn(0, 255)
-                    (0xFF shl 16) or (g shl 8)
-                }
-
-                result.setRGB(x, y, rgb)
+                val adjusted = (distance - toleranceNorm).coerceAtLeast(0.0)
+                val amplified = (adjusted * amplification).coerceIn(0.0, 1.0)
+                resultPixels[idx] = amplifiedToHeatRgb(amplified)
             }
         }
 
+        result.setRGB(0, 0, w, h, resultPixels, 0, w)
         return result
+    }
+
+    /**
+     * Neighborhood-aware diff: for each candidate pixel, finds the minimum RGB distance
+     * within a search radius of the reference. Absorbs subpixel shifts, AA gradients,
+     * and rendering engine differences without spreading them like blur does.
+     *
+     * @param radius Search radius in pixels. A 7x7 window (radius=3) handles
+     *   subpixel rendering differences between Skia and Java2D/PDFBox.
+     */
+    fun generateStructuralDiffImage(
+        reference: BufferedImage,
+        candidate: BufferedImage,
+        radius: Int = 3,
+        tolerance: Int = 8,
+        amplification: Float = 5f,
+    ): BufferedImage {
+        val ref = flattenOnWhite(reference)
+        val cand = flattenOnWhite(candidate)
+        val w = minOf(ref.width, cand.width)
+        val h = minOf(ref.height, cand.height)
+        val result = BufferedImage(maxOf(w, 1), maxOf(h, 1), BufferedImage.TYPE_INT_RGB)
+        val toleranceNorm = tolerance / 255.0
+        val refPixels = ref.getRGB(0, 0, w, h, null, 0, w)
+        val candPixels = cand.getRGB(0, 0, w, h, null, 0, w)
+        val resultPixels = IntArray(w * h) { GRAY_RGB }
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val candRgb = candPixels[y * w + x]
+                val cr = (candRgb shr 16) and 0xFF
+                val cg = (candRgb shr 8) and 0xFF
+                val cb = candRgb and 0xFF
+
+                var minDist = Double.MAX_VALUE
+                for (dy in -radius..radius) {
+                    val ny = y + dy
+                    if (ny < 0 || ny >= h) continue
+                    for (dx in -radius..radius) {
+                        val nx = x + dx
+                        if (nx < 0 || nx >= w) continue
+                        val refRgb = refPixels[ny * w + nx]
+                        val dr = (cr - ((refRgb shr 16) and 0xFF)) / 255.0
+                        val dg = (cg - ((refRgb shr 8) and 0xFF)) / 255.0
+                        val db = (cb - (refRgb and 0xFF)) / 255.0
+                        val dist = sqrt((dr * dr + dg * dg + db * db) / 3.0)
+                        if (dist < minDist) minDist = dist
+                    }
+                }
+
+                val adjusted = (minDist - toleranceNorm).coerceAtLeast(0.0)
+                val amplified = (adjusted * amplification).coerceIn(0.0, 1.0)
+                if (amplified >= 0.005) {
+                    resultPixels[y * w + x] = amplifiedToHeatRgb(amplified)
+                }
+            }
+        }
+
+        result.setRGB(0, 0, w, h, resultPixels, 0, w)
+        return result
+    }
+
+    private const val GRAY_RGB = (0xEE shl 16) or (0xEE shl 8) or 0xEE
+
+    /** Maps an amplified difference (0–1) to a blue→cyan→yellow→red heat ramp. */
+    private fun amplifiedToHeatRgb(amplified: Double): Int = if (amplified <= 0.5) {
+        val t = amplified / 0.5
+        val g = (t * 200).toInt().coerceIn(0, 255)
+        val b = (100 + t * 155).toInt().coerceIn(0, 255)
+        (g shl 8) or b
+    } else {
+        val t = (amplified - 0.5) / 0.5
+        val g = ((1.0 - t) * 220).toInt().coerceIn(0, 255)
+        (0xFF shl 16) or (g shl 8)
     }
 
     /**

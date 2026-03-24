@@ -122,7 +122,6 @@ h1 { margin: 0 0 4px 0; font-size: 24px; }
 .badge.warn { background: #FF9800; }
 .badge.fail { background: #f44336; }
 .badge.total { background: #607D8B; }
-.badge.skipped { background: #9E9E9E; }
 .stats-table { border-collapse: collapse; font-size: 13px; }
 .stats-table th, .stats-table td { padding: 4px 12px; text-align: right; }
 .stats-table th { text-align: left; font-weight: 600; }
@@ -131,6 +130,7 @@ h1 { margin: 0 0 4px 0; font-size: 24px; }
     display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
     margin-bottom: 16px; padding: 12px 16px; background: #fff;
     border: 1px solid #e0e0e0; border-radius: 8px;
+    position: sticky; top: 0; z-index: 100;
 }
 .filter-group { display: flex; align-items: center; gap: 4px; }
 .filter-group label { font-weight: 600; font-size: 13px; margin-right: 4px; }
@@ -144,48 +144,74 @@ h1 { margin: 0 0 4px 0; font-size: 24px; }
     padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;
     font-size: 12px; background: #fff;
 }
-table#fidelity-table {
-    width: 100%; border-collapse: collapse; background: #fff;
-    border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+#cards-container {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(700px, 1fr)); gap: 12px;
 }
-#fidelity-table th {
-    background: #f5f5f5; font-weight: 600; font-size: 12px;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    padding: 10px 8px; border-bottom: 2px solid #ddd; text-align: center;
+.fixture-card {
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+    overflow: hidden;
 }
-#fidelity-table td {
-    padding: 8px; vertical-align: middle; text-align: center;
-    border-bottom: 1px solid #eee;
+.fixture-card.status-pass { border-left: 4px solid #4CAF50; }
+.fixture-card.status-warn { border-left: 4px solid #FF9800; }
+.fixture-card.status-fail { border-left: 4px solid #f44336; }
+.card-header {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0; flex-wrap: wrap;
 }
-#fidelity-table td.fixture-cell { text-align: left; min-width: 160px; }
-.fixture-name { font-weight: 600; font-size: 14px; }
-.fixture-desc { font-size: 11px; color: #888; margin-top: 2px; }
+.fixture-name { font-weight: 700; font-size: 15px; }
+.fixture-desc { font-size: 12px; color: #888; flex-basis: 100%; margin-top: 2px; }
 .cat-badge {
     display: inline-block; padding: 2px 8px; border-radius: 3px;
-    font-size: 10px; font-weight: 600; color: #fff; margin-top: 4px;
+    font-size: 10px; font-weight: 600; color: #fff;
 }
+.status-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 10px; font-weight: 700; color: #fff; margin-left: auto;
+}
+.status-badge.pass { background: #4CAF50; }
+.status-badge.warn { background: #FF9800; }
+.status-badge.fail { background: #f44336; }
+.card-body { display: flex; }
+.ref-col {
+    flex: 0 0 auto; padding: 12px; border-right: 1px solid #f0f0f0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.ref-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #999; margin-bottom: 6px;
+}
+.modes-col { flex: 1; min-width: 0; }
+.mode-section { padding: 10px 16px; }
+.mode-section + .mode-section { border-top: 1px solid #f0f0f0; }
+.mode-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #555; margin-bottom: 8px;
+}
+.mode-content { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.mode-images { display: flex; gap: 8px; align-items: flex-start; }
+.img-group { text-align: center; }
+.img-label { font-size: 9px; color: #aaa; text-transform: uppercase; margin-bottom: 3px; }
 .thumb {
-    max-width: 160px; max-height: 220px; object-fit: contain;
+    max-width: 180px; max-height: 240px; object-fit: contain;
     border: 1px solid #eee; border-radius: 4px; cursor: pointer;
-    transition: transform 0.1s;
+    transition: transform 0.1s; display: block;
 }
 .thumb:hover { transform: scale(1.03); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
 .pdf-link {
-    display: block; text-align: center; font-size: 11px; margin-top: 4px;
+    display: block; text-align: center; font-size: 10px; margin-top: 3px;
     color: #1976D2; text-decoration: none;
 }
 .pdf-link:hover { text-decoration: underline; }
-.metrics { text-align: left !important; font-size: 12px; }
-.metrics table { border-collapse: collapse; width: 100%; }
-#fidelity-table .metrics td { padding: 2px 6px; border: none; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; }
-#fidelity-table .metrics td:first-child { font-weight: 600; color: #666; white-space: nowrap; }
+.mode-metrics {
+    font-size: 11px; font-family: 'SF Mono', Monaco, monospace;
+    display: flex; flex-direction: column; gap: 2px; padding-top: 2px;
+}
+.metric-row { display: flex; gap: 6px; }
+.metric-label { color: #888; font-weight: 600; min-width: 44px; }
+.metric-value { color: #333; }
 .pass-text { color: #2E7D32; font-weight: 700; }
 .warn-text { color: #E65100; font-weight: 700; }
 .fail-text { color: #C62828; font-weight: 700; }
-.skipped-text { color: #9E9E9E; font-weight: 700; }
-.row-pass { background: #f0fff0; }
-.row-warn { background: #fffff0; }
-.row-fail { background: #fff0f0; }
 .modal {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.85); z-index: 1000;
@@ -232,85 +258,94 @@ table#fidelity-table {
         appendLine("<button class='filter-btn' onclick='setStatus(\"fail\", this)'>Fail</button>")
         appendLine("</div>")
         appendLine("<div class='filter-group'><label>Sort:</label>")
-        appendLine("<select class='sort-select' onchange='sortTable(this.value)'>")
+        appendLine("<select class='sort-select' onchange='sortCards(this.value)'>")
         appendLine("<option value='name'>Name</option>")
         appendLine("<option value='worst'>Worst Metric</option>")
         appendLine("</select></div>")
         appendLine("</div>")
 
-        // Table
-        appendLine("<table id='fidelity-table'>")
-        appendLine("<thead><tr>")
-        appendLine("<th>Fixture</th>")
-        appendLine("<th>Compose (ref)</th>")
-        appendLine("<th>Vector PDF</th>")
-        appendLine("<th>Vector Diff</th>")
-        appendLine("<th>Raster PDF</th>")
-        appendLine("<th>Raster Diff</th>")
-        appendLine("<th>Vector Metrics</th>")
-        appendLine("<th>Raster Metrics</th>")
-        appendLine("</tr></thead>")
-        appendLine("<tbody>")
+        // Cards
+        appendLine("<div id='cards-container'>")
 
         for (result in results) {
             val worstMetric = maxOf(result.vectorRmse, result.rasterRmse)
-            val rowClass = "row-${result.rowStatus.cssClass}"
+            val statusClass = result.rowStatus.cssClass
             val catColor = categoryColors[result.category] ?: "#607D8B"
 
-            appendLine("<tr class='$rowClass' data-category='${escapeHtml(result.category)}' data-status='${result.rowStatus.cssClass}' data-name='${escapeHtml(result.name)}' data-worst-metric='${"%.6f".format(worstMetric)}'>")
+            appendLine("<div class='fixture-card status-$statusClass' data-category='${escapeHtml(result.category)}' data-status='$statusClass' data-name='${escapeHtml(result.name)}' data-worst-metric='$worstMetric'>")
 
-            // Fixture info
-            appendLine("<td class='fixture-cell'>")
-            appendLine("<div class='fixture-name'>${escapeHtml(result.name)}</div>")
-            if (result.description.isNotEmpty()) {
-                appendLine("<div class='fixture-desc'>${escapeHtml(result.description)}</div>")
-            }
+            // Header
+            appendLine("<div class='card-header'>")
+            appendLine("<span class='fixture-name'>${escapeHtml(result.name)}</span>")
             appendLine("<span class='cat-badge' style='background:$catColor'>${escapeHtml(result.category)}</span>")
-            appendLine("</td>")
+            appendLine("<span class='status-badge $statusClass'>${result.rowStatus.label}</span>")
+            if (result.description.isNotEmpty()) {
+                appendLine("<span class='fixture-desc'>${escapeHtml(result.description)}</span>")
+            }
+            appendLine("</div>")
 
-            // Compose reference
-            appendLine("<td><img class='thumb' src='${escapeHtml(result.composePath)}' alt='${escapeHtml(result.name)} compose' onclick='openModal(this.src)'></td>")
+            // Body
+            appendLine("<div class='card-body'>")
 
-            // Vector
-            appendLine("<td><img class='thumb' src='${escapeHtml(result.vectorPath)}' alt='${escapeHtml(result.name)} vector' onclick='openModal(this.src)'>")
+            // Compose reference column
+            appendLine("<div class='ref-col'>")
+            appendLine("<div class='ref-label'>Compose</div>")
+            appendLine("<img class='thumb' src='${escapeHtml(result.composePath)}' alt='${escapeHtml(result.name)} compose' onclick='openModal(this.src)'>")
+            appendLine("</div>")
+
+            // Modes column
+            appendLine("<div class='modes-col'>")
+
+            // Vector section
+            val vStatusClass = "${result.vectorStatus.cssClass}-text"
+            appendLine("<div class='mode-section'>")
+            appendLine("<div class='mode-label'>Vector</div>")
+            appendLine("<div class='mode-content'>")
+            appendLine("<div class='mode-images'>")
+            appendLine("<div class='img-group'><div class='img-label'>Rendered</div><img class='thumb' src='${escapeHtml(result.vectorPath)}' onclick='openModal(this.src)'>")
             if (result.vectorPdfPath.isNotEmpty()) {
                 appendLine("<a href='${escapeHtml(result.vectorPdfPath)}' class='pdf-link' target='_blank'>Open PDF</a>")
             }
-            appendLine("</td>")
-            appendLine("<td><img class='thumb' src='${escapeHtml(result.vectorDiffPath)}' alt='${escapeHtml(result.name)} vector diff' onclick='openModal(this.src)'></td>")
+            appendLine("</div>")
+            appendLine("<div class='img-group'><div class='img-label'>Diff</div><img class='thumb' src='${escapeHtml(result.vectorDiffPath)}' onclick='openModal(this.src)'></div>")
+            appendLine("</div>")
+            appendLine("<div class='mode-metrics'>")
+            appendLine("<div class='metric-row'><span class='metric-label'>RMSE</span><span class='metric-value'>${"%.4f".format(result.vectorRmse)}</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>SSIM</span><span class='metric-value'>${"%.4f".format(result.vectorSsim)}</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>Match</span><span class='metric-value'>${"%.2f".format(result.vectorExactMatch * 100)}%</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>MaxErr</span><span class='metric-value'>${"%.4f".format(result.vectorMaxError)}</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>Status</span><span class='metric-value $vStatusClass'>${result.vectorStatus.label}</span></div>")
+            appendLine("</div>")
+            appendLine("</div></div>")
 
-            // Raster
-            appendLine("<td><img class='thumb' src='${escapeHtml(result.rasterPath)}' alt='${escapeHtml(result.name)} raster' onclick='openModal(this.src)'>")
+            // Raster section
+            val rStatusClass = "${result.rasterStatus.cssClass}-text"
+            appendLine("<div class='mode-section'>")
+            appendLine("<div class='mode-label'>Raster</div>")
+            appendLine("<div class='mode-content'>")
+            appendLine("<div class='mode-images'>")
+            appendLine("<div class='img-group'><div class='img-label'>Rendered</div><img class='thumb' src='${escapeHtml(result.rasterPath)}' onclick='openModal(this.src)'>")
             if (result.rasterPdfPath.isNotEmpty()) {
                 appendLine("<a href='${escapeHtml(result.rasterPdfPath)}' class='pdf-link' target='_blank'>Open PDF</a>")
             }
-            appendLine("</td>")
-            appendLine("<td><img class='thumb' src='${escapeHtml(result.rasterDiffPath)}' alt='${escapeHtml(result.name)} raster diff' onclick='openModal(this.src)'></td>")
+            appendLine("</div>")
+            appendLine("<div class='img-group'><div class='img-label'>Diff</div><img class='thumb' src='${escapeHtml(result.rasterDiffPath)}' onclick='openModal(this.src)'></div>")
+            appendLine("</div>")
+            appendLine("<div class='mode-metrics'>")
+            appendLine("<div class='metric-row'><span class='metric-label'>RMSE</span><span class='metric-value'>${"%.4f".format(result.rasterRmse)}</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>SSIM</span><span class='metric-value'>${"%.4f".format(result.rasterSsim)}</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>Match</span><span class='metric-value'>${"%.2f".format(result.rasterExactMatch * 100)}%</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>MaxErr</span><span class='metric-value'>${"%.4f".format(result.rasterMaxError)}</span></div>")
+            appendLine("<div class='metric-row'><span class='metric-label'>Status</span><span class='metric-value $rStatusClass'>${result.rasterStatus.label}</span></div>")
+            appendLine("</div>")
+            appendLine("</div></div>")
 
-            // Vector metrics
-            val vStatusClass = "${result.vectorStatus.cssClass}-text"
-            appendLine("<td class='metrics'><table>")
-            appendLine("<tr><td>RMSE</td><td>${"%.4f".format(result.vectorRmse)}</td></tr>")
-            appendLine("<tr><td>SSIM</td><td>${"%.4f".format(result.vectorSsim)}</td></tr>")
-            appendLine("<tr><td>Match</td><td>${"%.2f".format(result.vectorExactMatch * 100)}%</td></tr>")
-            appendLine("<tr><td>MaxErr</td><td>${"%.4f".format(result.vectorMaxError)}</td></tr>")
-            appendLine("<tr><td>Status</td><td class='$vStatusClass'>${result.vectorStatus.label}</td></tr>")
-            appendLine("</table></td>")
-
-            // Raster metrics
-            val rStatusClass = "${result.rasterStatus.cssClass}-text"
-            appendLine("<td class='metrics'><table>")
-            appendLine("<tr><td>RMSE</td><td>${"%.4f".format(result.rasterRmse)}</td></tr>")
-            appendLine("<tr><td>SSIM</td><td>${"%.4f".format(result.rasterSsim)}</td></tr>")
-            appendLine("<tr><td>Match</td><td>${"%.2f".format(result.rasterExactMatch * 100)}%</td></tr>")
-            appendLine("<tr><td>MaxErr</td><td>${"%.4f".format(result.rasterMaxError)}</td></tr>")
-            appendLine("<tr><td>Status</td><td class='$rStatusClass'>${result.rasterStatus.label}</td></tr>")
-            appendLine("</table></td>")
-
-            appendLine("</tr>")
+            appendLine("</div>") // modes-col
+            appendLine("</div>") // card-body
+            appendLine("</div>") // fixture-card
         }
 
-        appendLine("</tbody></table>")
+        appendLine("</div>") // cards-container
 
         // Modal
         appendLine("<div id='modal' class='modal' onclick='closeModal()'><img id='modal-img' src=''></div>")
@@ -321,36 +356,36 @@ table#fidelity-table {
             """
 let activeCategory = 'all';
 let activeStatus = 'all';
-function filterRows() {
-    document.querySelectorAll('#fidelity-table > tbody > tr').forEach(function(row) {
-        var cat = row.getAttribute('data-category');
-        var status = row.getAttribute('data-status');
+function filterCards() {
+    document.querySelectorAll('.fixture-card').forEach(function(card) {
+        var cat = card.getAttribute('data-category');
+        var status = card.getAttribute('data-status');
         var catMatch = activeCategory === 'all' || cat === activeCategory;
         var statusMatch = activeStatus === 'all' || status === activeStatus;
-        row.style.display = (catMatch && statusMatch) ? '' : 'none';
+        card.style.display = (catMatch && statusMatch) ? '' : 'none';
     });
 }
 function setCategory(cat, btn) {
     activeCategory = cat;
     btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
-    filterRows();
+    filterCards();
 }
 function setStatus(status, btn) {
     activeStatus = status;
     btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
-    filterRows();
+    filterCards();
 }
-function sortTable(key) {
-    var tbody = document.querySelector('#fidelity-table tbody');
-    var rows = Array.from(tbody.querySelectorAll('tr'));
-    rows.sort(function(a, b) {
+function sortCards(key) {
+    var container = document.getElementById('cards-container');
+    var cards = Array.from(container.children);
+    cards.sort(function(a, b) {
         if (key === 'name') return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
         if (key === 'worst') return parseFloat(b.getAttribute('data-worst-metric')) - parseFloat(a.getAttribute('data-worst-metric'));
         return 0;
     });
-    rows.forEach(function(row) { tbody.appendChild(row); });
+    cards.forEach(function(card) { container.appendChild(card); });
 }
 function openModal(src) {
     document.getElementById('modal-img').src = src;

@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.IntSize
 import com.chrisjenx.compose2pdf.PdfPageConfig
 import kotlinx.coroutines.Dispatchers
 import org.apache.pdfbox.Loader
+import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.rendering.PDFRenderer
 import org.jetbrains.skia.OutputWStream
 import org.jetbrains.skia.PictureRecorder
@@ -63,19 +64,21 @@ internal fun compositeOnPage(
     return image
 }
 
-internal fun rasterizePdf(pdfBytes: ByteArray, renderDpi: Float): BufferedImage {
-    Loader.loadPDF(pdfBytes).use { doc ->
-        val renderer = PDFRenderer(doc)
-        renderer.setRenderingHints(RenderingHints(mapOf(
-            RenderingHints.KEY_ANTIALIASING to RenderingHints.VALUE_ANTIALIAS_ON,
-            RenderingHints.KEY_TEXT_ANTIALIASING to RenderingHints.VALUE_TEXT_ANTIALIAS_ON,
-            RenderingHints.KEY_FRACTIONALMETRICS to RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-            RenderingHints.KEY_STROKE_CONTROL to RenderingHints.VALUE_STROKE_PURE,
-            RenderingHints.KEY_RENDERING to RenderingHints.VALUE_RENDER_QUALITY,
-            RenderingHints.KEY_INTERPOLATION to RenderingHints.VALUE_INTERPOLATION_BICUBIC,
-        )))
-        return renderer.renderImageWithDPI(0, renderDpi)
-    }
+internal fun rasterizePdf(pdfBytes: ByteArray, renderDpi: Float, page: Int = 0): BufferedImage {
+    Loader.loadPDF(pdfBytes).use { doc -> return rasterizePdf(doc, renderDpi, page) }
+}
+
+internal fun rasterizePdf(doc: PDDocument, renderDpi: Float, page: Int = 0): BufferedImage {
+    val renderer = PDFRenderer(doc)
+    renderer.setRenderingHints(RenderingHints(mapOf(
+        RenderingHints.KEY_ANTIALIASING to RenderingHints.VALUE_ANTIALIAS_ON,
+        RenderingHints.KEY_TEXT_ANTIALIASING to RenderingHints.VALUE_TEXT_ANTIALIAS_ON,
+        RenderingHints.KEY_FRACTIONALMETRICS to RenderingHints.VALUE_FRACTIONALMETRICS_ON,
+        RenderingHints.KEY_STROKE_CONTROL to RenderingHints.VALUE_STROKE_PURE,
+        RenderingHints.KEY_RENDERING to RenderingHints.VALUE_RENDER_QUALITY,
+        RenderingHints.KEY_INTERPOLATION to RenderingHints.VALUE_INTERPOLATION_BICUBIC,
+    )))
+    return renderer.renderImageWithDPI(page, renderDpi)
 }
 
 internal fun saveImage(image: BufferedImage, imagesDir: File, filename: String) {

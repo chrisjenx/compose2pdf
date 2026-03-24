@@ -18,3 +18,4 @@ rootProject.name = "compose2pdf"
 
 include(":compose2pdf")
 include(":fidelity-test")
+include(":examples")
