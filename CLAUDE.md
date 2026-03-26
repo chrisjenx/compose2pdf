@@ -9,7 +9,8 @@
 ```
 ├── compose2pdf/          # Library: public API + SVG→PDF converter + font resolver
 ├── examples/             # Runnable examples (not published)
-└── fidelity-test/        # Visual regression tests (not published)
+├── fidelity-test/        # Visual regression tests (not published)
+└── docs/                 # Jekyll docs site (GitHub Pages, just-the-docs theme)
 ```
 
 ## Tech Stack
@@ -30,6 +31,7 @@
 ./gradlew :compose2pdf:compileKotlin        # Quick compile check (no tests)
 ./gradlew :examples:run                     # Run examples, output to examples/build/output/
 open fidelity-test/build/reports/fidelity/index.html  # View fidelity report (macOS)
+cd docs && bundle exec jekyll serve             # Preview docs site locally (http://localhost:4000)
 ```
 
 ## Fidelity Tests
@@ -78,7 +80,9 @@ Compose content → ComposeToSvg.render() → SVG string
     ├── SvgColorParser + SvgColor (CSS/SVG color parsing)
     ├── SvgShapeRenderer (ellipse, rounded rect geometry)
     └── CoordinateTransform (SVG Y-down ↔ PDF Y-up)
-  → PDFBox vector drawing commands → ByteArray (PDF)
+  → PDFBox vector drawing commands → PDDocument
+
+Callers: Compose2Pdf.kt saves PDDocument → OutputStream or ByteArray
 
 Raster fallback: ImageComposeScene → bitmap → PDFBox embedded image
 
@@ -96,6 +100,7 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 - **SVGCanvas bezier approximation** — non-uniform rounded rects become complex bezier paths; use `PdfRoundedCornerShape`
 - **Bundled fonts loaded from classpath** — `FontResolver` loads Inter fonts directly from `InputStream`, no temp files
 - **`Compose2PdfException` wraps rendering errors** — `IllegalArgumentException` (precondition failures) passes through unwrapped
+- **OutputStream overloads don't close the stream** — caller owns the stream lifecycle; `PDDocument.use { it.save(outputStream) }` is called internally
 
 ### Auto-pagination
 - **Measures in tall scene** — `PdfRenderer` uses a 200K px max scene height for measurement; Compose `Constraints` limit is ~262K px
