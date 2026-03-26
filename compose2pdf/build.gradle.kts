@@ -7,9 +7,10 @@ plugins {
 }
 
 dependencies {
-    implementation(compose.desktop.currentOs)
+    implementation(compose.desktop.common)
     implementation(libs.pdfbox)
 
+    testImplementation(compose.desktop.currentOs)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
 }
