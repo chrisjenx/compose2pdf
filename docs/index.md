@@ -2,11 +2,12 @@
 title: Home
 layout: home
 nav_order: 1
+description: "Kotlin JVM library for PDF generation from Compose Desktop — vector text, embedded fonts, auto-pagination, and server-side streaming with Ktor."
 ---
 
-# compose2pdf
+# compose2pdf — Kotlin PDF Library for Compose Desktop
 
-**Render Compose Desktop content directly to PDF** -- vector text, embedded fonts, and page-perfect layout.
+**Generate production-quality PDFs from Compose Desktop content** — vector text, embedded fonts, auto-pagination, and server-side streaming. A Kotlin JVM library that turns your `@Composable` functions into PDF documents.
 {: .fs-6 .fw-300 }
 
 [Get Started]({{ site.baseurl }}/getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
@@ -78,10 +79,21 @@ No new DSL to learn. Write `@Composable` functions, pass them to `renderToPdf()`
 | **Raster fallback** | Pixel-perfect rendering as an embedded image |
 | **Font embedding** | Bundled Inter fonts or system font resolution with automatic subsetting |
 | **Link annotations** | Clickable URLs in the PDF via `PdfLink` |
-| **Multi-page** | Render multiple pages in a single PDF |
+| **Auto-pagination** | Content automatically flows across pages; elements kept together at boundaries |
+| **Multi-page** | Render multiple pages in a single PDF (automatic or manual) |
+| **Streaming output** | Write PDFs directly to an `OutputStream` for Ktor, servlets, or files |
 | **Page presets** | A4, Letter, A3 with configurable margins and landscape support |
 | **Shapes** | Backgrounds, borders, clips, rounded corners, Canvas drawing |
 | **Images** | Embed bitmap images with clipping and layout |
+
+---
+
+## How it works
+
+compose2pdf renders your Compose content through a **Skia SVGCanvas → Apache PDFBox** pipeline. Compose Desktop's layout engine runs your composables, Skia captures the draw calls as SVG, and compose2pdf converts that to vector PDF commands with embedded fonts and link annotations.
+
+{: .note }
+**Want native PDF output from Skia?** [Skiko PR #775](https://github.com/JetBrains/skiko/pull/775) proposes adding a direct PDF backend to Skia/Skiko. This would eliminate the SVG intermediary — faster rendering, smaller files, and full gradient/effect support in vector mode. If this matters to you, upvote the PR!
 
 ---
 

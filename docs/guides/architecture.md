@@ -132,6 +132,27 @@ PDFBox's `PDType0Font.load()` automatically subsets embedded fonts -- only the g
 
 ---
 
+## Future: native Skia PDF backend
+
+The current vector pipeline goes through an SVG intermediary: **Compose → Skia Picture → SVGCanvas → SVG string → XML parse → PDFBox commands**. This works well but introduces inherent limitations — gradients and some visual effects don't survive the SVG round-trip.
+
+[**Skiko PR #775**](https://github.com/JetBrains/skiko/pull/775) proposes adding a thin wrapper around Skia's native PDF backend (`SkDocument`). If merged, this would enable a much simpler pipeline:
+
+```
+Current:  Compose → Skia → SVG → parse → PDFBox → PDF
+Future:   Compose → Skia → PDF (direct)
+```
+
+Benefits of the native PDF backend:
+- **Full visual fidelity** — gradients, shadows, blur, and all Skia effects preserved
+- **Faster rendering** — no SVG serialization/parsing overhead
+- **Smaller file sizes** — Skia's PDF backend is optimized for compactness
+- **Simpler codebase** — eliminates SvgToPdfConverter, SvgPathParser, SvgColorParser, CoordinateTransform
+
+If native PDF rendering in Compose Desktop matters to you, please upvote [JetBrains/skiko#775](https://github.com/JetBrains/skiko/pull/775).
+
+---
+
 ## See also
 
 - [Vector vs Raster]({{ site.baseurl }}/usage/vector-vs-raster) -- User-facing comparison

@@ -1,9 +1,10 @@
 # Compose 2 PDF
 
 [![CI](https://github.com/chrisjenx/compose2pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisjenx/compose2pdf/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/com.chrisjenx/compose2pdf)](https://central.sonatype.com/artifact/com.chrisjenx/compose2pdf)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Render [Compose Desktop](https://www.jetbrains.com/compose-multiplatform/) content directly to PDF.
+A **Kotlin JVM library** for rendering [Compose Desktop](https://www.jetbrains.com/compose-multiplatform/) content directly to PDF. Generate production-quality PDF documents with vector text, embedded fonts, auto-pagination, and server-side streaming support.
 
 ```kotlin
 val pdfBytes = renderToPdf {
@@ -29,6 +30,7 @@ File("hello.pdf").writeBytes(pdfBytes)
 - **Auto-pagination** — content automatically flows across pages; elements are kept together at page boundaries
 - **Multi-page** — render multiple pages in a single PDF (manual or automatic)
 - **Page presets** — A4, Letter, A3 with configurable margins and landscape support
+- **Streaming output** — write PDFs directly to an `OutputStream` for Ktor, servlets, or any JVM server
 
 ## Installation
 
@@ -110,6 +112,17 @@ PdfLink(href = "https://example.com") {
     Text("Click me", color = Color.Blue, textDecoration = TextDecoration.Underline)
 }
 ```
+
+## How it works
+
+compose2pdf renders Compose content through a **Skia SVGCanvas → Apache PDFBox** pipeline:
+
+1. Your `@Composable` content is rendered by Compose Desktop's layout engine
+2. Skia's SVGCanvas captures the draw calls as SVG
+3. compose2pdf converts the SVG to PDF vector commands via PDFBox
+4. Fonts are resolved, subsetted, and embedded; link annotations are mapped to PDF coordinates
+
+> **Want native PDF output from Skia?** The [Skiko PR #775](https://github.com/JetBrains/skiko/pull/775) proposes adding a direct PDF backend to Skia/Skiko, which would eliminate the SVG intermediary entirely — producing smaller files, faster rendering, and full gradient/effect support in vector mode. If this matters to you, upvote the PR!
 
 ## Documentation
 

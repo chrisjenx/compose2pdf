@@ -27,7 +27,10 @@ mavenPublishing {
     coordinates("com.chrisjenx", "compose2pdf", version.toString())
     pom {
         name.set("compose2pdf")
-        description.set("Render Compose Desktop content to PDF")
+        description.set(
+            "Kotlin JVM library for rendering Compose Desktop content to production-quality PDFs " +
+                "with vector text, embedded fonts, auto-pagination, and server-side streaming support."
+        )
         url.set("https://github.com/chrisjenx/compose2pdf")
         licenses {
             license {
