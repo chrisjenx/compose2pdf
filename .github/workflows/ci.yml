@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+        java-version: [17, 21]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +23,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: ${{ matrix.java-version }}
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -33,15 +34,15 @@ jobs:
         run: ./gradlew :compose2pdf:test
 
       - name: Fidelity tests (Linux)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.java-version == 17
         run: xvfb-run ./gradlew :fidelity-test:test
 
       - name: Fidelity tests (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && matrix.java-version == 17
         run: ./gradlew :fidelity-test:test
 
       - name: Upload fidelity report
-        if: always()
+        if: always() && matrix.java-version == 17
         uses: actions/upload-artifact@v4
         with:
           name: fidelity-report-${{ matrix.os }}
@@ -49,4 +50,5 @@ jobs:
           if-no-files-found: ignore
 
       - name: Smoke test publishToMavenLocal
+        if: matrix.os == 'ubuntu-latest' && matrix.java-version == 17
         run: ./gradlew :compose2pdf:publishToMavenLocal

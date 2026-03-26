@@ -17,7 +17,7 @@ enum class PdfPagination {
     AUTO,
 
     /**
-     * Clip content to a single page (legacy behavior).
+     * Render all content on a single page, clipping anything that overflows.
      */
     SINGLE_PAGE,
 }
