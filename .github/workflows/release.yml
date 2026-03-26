@@ -115,16 +115,24 @@ jobs:
         run: |
           git config user.name "compose2pdf-release-bot[bot]"
           git config user.email "compose2pdf-release-bot[bot]@users.noreply.github.com"
-          git tag -a "v${{ inputs.version }}" -m "Release ${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
+          if git ls-remote --tags origin "v${{ inputs.version }}" | grep -q .; then
+            echo "Tag v${{ inputs.version }} already exists, skipping"
+          else
+            git tag -a "v${{ inputs.version }}" -m "Release ${{ inputs.version }}"
+            git push origin "v${{ inputs.version }}"
+          fi
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          gh release create "v${{ inputs.version }}" \
-            --title "v${{ inputs.version }}" \
-            --generate-notes
+          if gh release view "v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Release v${{ inputs.version }} already exists, skipping"
+          else
+            gh release create "v${{ inputs.version }}" \
+              --title "v${{ inputs.version }}" \
+              --generate-notes
+          fi
 
   bump-version:
     needs: tag-and-release
@@ -152,8 +160,14 @@ jobs:
       - name: Bump version and push to main
         run: |
           NEXT="${{ steps.next.outputs.version }}"
+          CURRENT=$(grep '^version=' gradle.properties | cut -d'=' -f2)
+          if [ "$CURRENT" = "$NEXT" ]; then
+            echo "Version already at $NEXT, skipping"
+            exit 0
+          fi
           git config user.name "compose2pdf-release-bot[bot]"
           git config user.email "compose2pdf-release-bot[bot]@users.noreply.github.com"
+          git pull origin main
           sed -i "s/^version=.*/version=${NEXT}/" gradle.properties
           git add gradle.properties
           git commit -m "Bump version to ${NEXT}"
