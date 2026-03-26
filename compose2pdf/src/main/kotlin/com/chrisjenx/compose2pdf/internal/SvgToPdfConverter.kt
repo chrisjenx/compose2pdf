@@ -26,6 +26,8 @@ import javax.xml.parsers.DocumentBuilderFactory
  */
 internal object SvgToPdfConverter {
 
+    private val logger = java.util.logging.Logger.getLogger(SvgToPdfConverter::class.java.name)
+
     fun addPage(
         pdfDoc: PDDocument,
         svg: String,
@@ -114,10 +116,12 @@ internal object SvgToPdfConverter {
         }
     }
 
+    private val documentBuilderFactory: DocumentBuilderFactory by lazy {
+        DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+    }
+
     private fun parseSvg(svg: String): Pair<Element, Map<String, Element>> {
-        val factory = DocumentBuilderFactory.newInstance()
-        factory.isNamespaceAware = true
-        val xmlDoc = factory.newDocumentBuilder().parse(svg.byteInputStream())
+        val xmlDoc = documentBuilderFactory.newDocumentBuilder().parse(svg.byteInputStream())
         val svgRoot = xmlDoc.documentElement
         val defs = mutableMapOf<String, Element>()
         collectDefs(svgRoot, defs)
@@ -196,8 +200,10 @@ internal object SvgToPdfConverter {
 
             val x = attr(elem, "x")?.toFloatOrNull() ?: 0f
             val y = attr(elem, "y")?.toFloatOrNull() ?: 0f
-            val w = attr(elem, "width")?.toFloatOrNull() ?: return restore()
-            val h = attr(elem, "height")?.toFloatOrNull() ?: return restore()
+            val w = attr(elem, "width")?.toFloatOrNull()
+                ?: return restore().also { logger.warning("Skipping rect: missing or invalid width '${attr(elem, "width")}'") }
+            val h = attr(elem, "height")?.toFloatOrNull()
+                ?: return restore().also { logger.warning("Skipping rect: missing or invalid height '${attr(elem, "height")}'") }
             val rx = attr(elem, "rx")?.toFloatOrNull() ?: 0f
             val ry = attr(elem, "ry")?.toFloatOrNull() ?: rx
 
@@ -216,7 +222,8 @@ internal object SvgToPdfConverter {
 
             val cx = attr(elem, "cx")?.toFloatOrNull() ?: 0f
             val cy = attr(elem, "cy")?.toFloatOrNull() ?: 0f
-            val r = attr(elem, "r")?.toFloatOrNull() ?: return restore()
+            val r = attr(elem, "r")?.toFloatOrNull()
+                ?: return restore().also { logger.warning("Skipping circle: missing or invalid radius '${attr(elem, "r")}'") }
 
             SvgShapeRenderer.drawEllipse(cs, cx, cy, r, r)
             fillAndStroke(elem)
@@ -229,8 +236,10 @@ internal object SvgToPdfConverter {
 
             val cx = attr(elem, "cx")?.toFloatOrNull() ?: 0f
             val cy = attr(elem, "cy")?.toFloatOrNull() ?: 0f
-            val rx = attr(elem, "rx")?.toFloatOrNull() ?: return restore()
-            val ry = attr(elem, "ry")?.toFloatOrNull() ?: return restore()
+            val rx = attr(elem, "rx")?.toFloatOrNull()
+                ?: return restore().also { logger.warning("Skipping ellipse: missing or invalid rx '${attr(elem, "rx")}'") }
+            val ry = attr(elem, "ry")?.toFloatOrNull()
+                ?: return restore().also { logger.warning("Skipping ellipse: missing or invalid ry '${attr(elem, "ry")}'") }
 
             SvgShapeRenderer.drawEllipse(cs, cx, cy, rx, ry)
             fillAndStroke(elem)
@@ -366,8 +375,10 @@ internal object SvgToPdfConverter {
             cs.saveGraphicsState()
             applyTransform(elem); applyOpacity(elem)
 
-            val width = attr(elem, "width")?.toFloatOrNull() ?: return restore()
-            val height = attr(elem, "height")?.toFloatOrNull() ?: return restore()
+            val width = attr(elem, "width")?.toFloatOrNull()
+                ?: return restore().also { logger.warning("Skipping image: missing or invalid width '${attr(elem, "width")}'") }
+            val height = attr(elem, "height")?.toFloatOrNull()
+                ?: return restore().also { logger.warning("Skipping image: missing or invalid height '${attr(elem, "height")}'") }
 
             val href = elem.getAttribute("href").ifEmpty {
                 elem.getAttributeNS("http://www.w3.org/1999/xlink", "href")
@@ -604,17 +615,25 @@ internal object SvgToPdfConverter {
 
         // ── Attribute resolution ────────────────────────────────────────
 
+        // Cache for parsed inline style attributes — avoids re-parsing the same style string
+        private var cachedStyleElem: Element? = null
+        private var cachedStyleMap: Map<String, String>? = null
+
         /** Resolves an SVG attribute, checking `style` attribute first (CSS inline styles). */
         private fun attr(elem: Element, name: String): String? {
             val style = elem.getAttribute("style")
             if (style.isNotEmpty()) {
-                for (prop in style.split(";")) {
-                    val colon = prop.indexOf(':')
-                    if (colon < 0) continue
-                    if (prop.substring(0, colon).trim() == name) {
-                        return prop.substring(colon + 1).trim().takeIf { it.isNotEmpty() }
-                    }
+                val map = if (elem === cachedStyleElem) cachedStyleMap!! else {
+                    val m = style.split(";").mapNotNull { prop ->
+                        val colon = prop.indexOf(':')
+                        if (colon < 0) null
+                        else prop.substring(0, colon).trim() to prop.substring(colon + 1).trim()
+                    }.toMap()
+                    cachedStyleElem = elem
+                    cachedStyleMap = m
+                    m
                 }
+                map[name]?.takeIf { it.isNotEmpty() }?.let { return it }
             }
             return elem.getAttribute(name).takeIf { it.isNotEmpty() }
         }

@@ -8,8 +8,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import org.apache.pdfbox.Loader
+import java.util.logging.Handler
+import java.util.logging.LogRecord
+import java.util.logging.Logger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -134,6 +138,37 @@ class AutoPaginationTest {
         }
         Loader.loadPDF(bytes).use { doc ->
             assertEquals(1, doc.numberOfPages, "600dp of content should fit on 1 page of 698dp")
+        }
+    }
+
+    @Test
+    fun `auto pagination logs warning when page count exceeds max`() {
+        val logs = mutableListOf<String>()
+        val handler = object : Handler() {
+            override fun publish(record: LogRecord) { logs.add(record.message) }
+            override fun flush() {}
+            override fun close() {}
+        }
+        val logger = Logger.getLogger("com.chrisjenx.compose2pdf.internal.PdfRenderer")
+        logger.addHandler(handler)
+        try {
+            // Use a tiny page config so content easily exceeds 100 pages
+            // contentHeight ~20dp, 100+ pages of 20dp = 2000dp+ needed
+            val tinyConfig = PdfPageConfig(
+                width = 100.dp, height = 30.dp, margins = PdfMargins(top = 5.dp, bottom = 5.dp),
+            )
+            // 120 spacers at 20dp = 2400dp total / 20dp per page = 120 pages > 100 max
+            renderToPdf(config = tinyConfig, density = Density(1f)) {
+                repeat(120) {
+                    Spacer(Modifier.fillMaxWidth().height(20.dp))
+                }
+            }
+            assertTrue(
+                logs.any { it.contains("truncated") || it.contains("exceeded") || it.contains("max") },
+                "Should log warning about page truncation, got logs: $logs"
+            )
+        } finally {
+            logger.removeHandler(handler)
         }
     }
 

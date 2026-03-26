@@ -28,7 +28,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
+import com.chrisjenx.compose2pdf.internal.SvgToPdfConverter
+import org.apache.pdfbox.pdmodel.PDDocument
 import java.io.File
+import java.util.logging.Handler
+import java.util.logging.LogRecord
+import java.util.logging.Logger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -302,6 +307,119 @@ class SvgConverterTest {
         Loader.loadPDF(bytes).use { doc ->
             val annotations = doc.getPage(0).annotations
             assertEquals(1, annotations.size, "Should have 1 link annotation in raster mode")
+        }
+    }
+
+    // --- SVG element warning tests ---
+
+    private fun collectLogs(loggerName: String, block: () -> Unit): List<String> {
+        val logs = mutableListOf<String>()
+        val handler = object : Handler() {
+            override fun publish(record: LogRecord) { logs.add(record.message) }
+            override fun flush() {}
+            override fun close() {}
+        }
+        val logger = Logger.getLogger(loggerName)
+        logger.addHandler(handler)
+        try {
+            block()
+        } finally {
+            logger.removeHandler(handler)
+        }
+        return logs
+    }
+
+    private val converterLogger = "com.chrisjenx.compose2pdf.internal.SvgToPdfConverter"
+
+    @Test
+    fun `malformed rect width logs warning`() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+            <rect x="10" y="10" width="abc" height="50" fill="red"/>
+        </svg>"""
+        val logs = collectLogs(converterLogger) {
+            PDDocument().use { doc ->
+                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+            }
+        }
+        assertTrue(
+            logs.any { "rect" in it.lowercase() && ("width" in it.lowercase() || "skip" in it.lowercase()) },
+            "Should warn about malformed rect, got: $logs"
+        )
+    }
+
+    @Test
+    fun `missing circle radius logs warning`() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+            <circle cx="50" cy="50" fill="blue"/>
+        </svg>"""
+        val logs = collectLogs(converterLogger) {
+            PDDocument().use { doc ->
+                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+            }
+        }
+        assertTrue(
+            logs.any { "circle" in it.lowercase() || "radius" in it.lowercase() },
+            "Should warn about missing circle radius, got: $logs"
+        )
+    }
+
+    @Test
+    fun `missing ellipse rx logs warning`() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+            <ellipse cx="50" cy="50" ry="30" fill="green"/>
+        </svg>"""
+        val logs = collectLogs(converterLogger) {
+            PDDocument().use { doc ->
+                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+            }
+        }
+        assertTrue(
+            logs.any { "ellipse" in it.lowercase() || "rx" in it.lowercase() },
+            "Should warn about missing ellipse rx, got: $logs"
+        )
+    }
+
+    @Test
+    fun `missing image dimensions logs warning`() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+            <image href="data:image/png;base64,iVBOR" fill="red"/>
+        </svg>"""
+        val logs = collectLogs(converterLogger) {
+            PDDocument().use { doc ->
+                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+            }
+        }
+        assertTrue(
+            logs.any { "image" in it.lowercase() && ("width" in it.lowercase() || "dimension" in it.lowercase() || "skip" in it.lowercase()) },
+            "Should warn about missing image dimensions, got: $logs"
+        )
+    }
+
+    // --- Inline style caching correctness ---
+
+    @Test
+    fun `elements with inline styles render correctly`() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+            <rect x="10" y="10" width="80" height="80" style="fill:red;stroke:blue;stroke-width:2"/>
+            <rect x="110" y="10" width="80" height="80" style="fill:green;stroke:none"/>
+            <circle cx="50" cy="150" r="30" style="fill:yellow;stroke:black;stroke-width:1"/>
+        </svg>"""
+        PDDocument().use { doc ->
+            SvgToPdfConverter.addPage(doc, svg, 200f, 200f)
+            assertEquals(1, doc.numberOfPages)
+        }
+    }
+
+    @Test
+    fun `multiple pages with same SVG produce valid PDF`() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+            <rect x="10" y="10" width="80" height="80" fill="red"/>
+        </svg>"""
+        PDDocument().use { doc ->
+            repeat(10) {
+                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+            }
+            assertEquals(10, doc.numberOfPages)
         }
     }
 }

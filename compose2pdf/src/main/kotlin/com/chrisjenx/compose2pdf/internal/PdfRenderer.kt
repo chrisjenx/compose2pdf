@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.ui.text.TextStyle
+import com.chrisjenx.compose2pdf.Compose2PdfException
 import com.chrisjenx.compose2pdf.LocalPdfLinkCollector
 import com.chrisjenx.compose2pdf.LocalPdfPageConfig
 import com.chrisjenx.compose2pdf.PdfLinkAnnotation
@@ -31,6 +32,8 @@ import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
 internal object PdfRenderer {
+
+    private val logger = java.util.logging.Logger.getLogger(PdfRenderer::class.java.name)
 
     private const val MAX_AUTO_PAGES = 100
     // Compose Constraints max dimension is ~262143px. Stay well under that limit.
@@ -127,6 +130,12 @@ internal object PdfRenderer {
 
         val pageLayout = PageLayout.from(config)
         val totalContentHeightPt = result.measuredHeightPx.coerceAtLeast(1) / density.density
+        val estimatedPages = kotlin.math.ceil(totalContentHeightPt.toDouble() / pageLayout.contentHeightPt).toInt()
+        if (estimatedPages > MAX_AUTO_PAGES) {
+            logger.warning(
+                "Auto-pagination truncated: content requires ~$estimatedPages pages but max is $MAX_AUTO_PAGES"
+            )
+        }
 
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
@@ -165,8 +174,13 @@ internal object PdfRenderer {
             }
         }
 
-        val pageCount = kotlin.math.ceil(measuredHeightPx.toFloat() / contentHeightPx.toFloat())
-            .toInt().coerceIn(1, MAX_AUTO_PAGES)
+        val rawPageCount = kotlin.math.ceil(measuredHeightPx.toFloat() / contentHeightPx.toFloat()).toInt()
+        if (rawPageCount > MAX_AUTO_PAGES) {
+            logger.warning(
+                "Auto-pagination truncated: content requires ~$rawPageCount pages but max is $MAX_AUTO_PAGES"
+            )
+        }
+        val pageCount = rawPageCount.coerceIn(1, MAX_AUTO_PAGES)
 
         val doc = PDDocument()
         try {
@@ -297,7 +311,8 @@ internal object PdfRenderer {
     }
 
     private fun skiaImageToBufferedImage(image: org.jetbrains.skia.Image): BufferedImage {
-        val data = image.encodeToData() ?: error("Failed to encode Skia Image to PNG")
+        val data = image.encodeToData()
+            ?: throw Compose2PdfException("Failed to encode Skia image to PNG data")
         return ImageIO.read(ByteArrayInputStream(data.bytes))
     }
 

@@ -11,8 +11,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.apache.pdfbox.Loader
+import androidx.compose.ui.unit.Density
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class BasicRenderTest {
@@ -69,6 +71,27 @@ class BasicRenderTest {
             assertTrue(false, "Should have thrown")
         } catch (e: IllegalArgumentException) {
             assertTrue(e.message!!.contains("positive"))
+        }
+    }
+
+    @Test
+    fun `renderToPdf with zero density throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            renderToPdf(density = Density(0f)) { Text("boom") }
+        }
+    }
+
+    @Test
+    fun `renderToPdf with negative density throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            renderToPdf(density = Density(-1f)) { Text("boom") }
+        }
+    }
+
+    @Test
+    fun `multi-page renderToPdf with zero density throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            renderToPdf(pages = 1, density = Density(0f)) { Text("boom") }
         }
     }
 }
