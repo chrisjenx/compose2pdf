@@ -140,6 +140,30 @@ renderToPdf(pages = pageCount) { pageIndex ->
 
 ---
 
+## Use streaming for large documents or servers
+
+For large PDFs or server-side rendering, use the `OutputStream` overload to avoid holding the final PDF bytes in memory:
+
+```kotlin
+// Stream to a file
+FileOutputStream("report.pdf").use { out ->
+    renderToPdf(out, config = PdfPageConfig.A4WithMargins) {
+        LargeReport(data)
+    }
+}
+
+// Stream to an HTTP response (Ktor)
+call.respondOutputStream(ContentType.Application.Pdf) {
+    renderToPdf(this) { ReportContent() }
+}
+```
+
+The `ByteArray` variant is simpler for small documents. Use `OutputStream` when memory matters.
+
+See [Server-side & Ktor]({{ site.baseurl }}/guides/server-side) for more patterns.
+
+---
+
 ## Serialize concurrent renders
 
 `renderToPdf` is not thread-safe. If generating PDFs concurrently:

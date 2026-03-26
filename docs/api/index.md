@@ -18,8 +18,11 @@ import com.chrisjenx.compose2pdf.*
 
 | Function / Type | Description |
 |:----------------|:------------|
-| [`renderToPdf { content }`]({{ site.baseurl }}/api/render-to-pdf) | Render a single page to PDF |
-| [`renderToPdf(pages) { pageIndex -> content }`]({{ site.baseurl }}/api/render-to-pdf) | Render multiple pages to PDF |
+| [`renderToPdf { content }`]({{ site.baseurl }}/api/render-to-pdf) | Render to PDF, returns `ByteArray` |
+| [`renderToPdf(outputStream) { content }`]({{ site.baseurl }}/api/render-to-pdf) | Render to PDF, writes to `OutputStream` (streaming) |
+| [`renderToPdf(pages) { pageIndex -> content }`]({{ site.baseurl }}/api/render-to-pdf) | Render multiple pages, returns `ByteArray` |
+| [`renderToPdf(outputStream, pages) { pageIndex -> content }`]({{ site.baseurl }}/api/render-to-pdf) | Render multiple pages, writes to `OutputStream` |
+| `PdfPagination` | `AUTO` (auto-paginate) or `SINGLE_PAGE` (clip) |
 | [`PdfPageConfig`]({{ site.baseurl }}/api/pdf-page-config) | Page dimensions and margins (A4, Letter, A3, custom) |
 | [`PdfMargins`]({{ site.baseurl }}/api/pdf-margins) | Page margin presets and custom margins |
 | [`PdfLink`]({{ site.baseurl }}/api/pdf-link) | Clickable URL annotation composable |

@@ -6,7 +6,7 @@ nav_order: 1
 
 # renderToPdf
 
-The primary entry point for PDF generation. Two overloads: auto-paginating (default) and manual multi-page.
+The primary entry point for PDF generation. Four overloads: auto-paginating and manual multi-page, each with `ByteArray` and `OutputStream` variants.
 
 ---
 
@@ -62,6 +62,42 @@ val pdfBytes = renderToPdf(
     SummarySection()       // pushed to next page if needed
 }
 File("report.pdf").writeBytes(pdfBytes)
+```
+
+---
+
+## Auto-paginating (OutputStream)
+
+```kotlin
+fun renderToPdf(
+    outputStream: OutputStream,
+    config: PdfPageConfig = PdfPageConfig.A4,
+    density: Density = Density(2f),
+    mode: RenderMode = RenderMode.VECTOR,
+    defaultFontFamily: FontFamily? = InterFontFamily,
+    pagination: PdfPagination = PdfPagination.AUTO,
+    content: @Composable () -> Unit,
+)
+```
+
+Streaming variant -- writes the PDF directly to `outputStream` without creating an intermediate `ByteArray`. The stream is **not closed** by this function.
+
+Parameters and behavior are identical to the `ByteArray` variant above.
+
+### Example
+
+```kotlin
+// Ktor
+call.respondOutputStream(ContentType.Application.Pdf) {
+    renderToPdf(this, config = PdfPageConfig.A4WithMargins) {
+        ReportContent(data)
+    }
+}
+
+// File
+FileOutputStream("report.pdf").use { out ->
+    renderToPdf(out) { ReportContent(data) }
+}
 ```
 
 ---
@@ -124,6 +160,36 @@ val pdfBytes = renderToPdf(
 
 ---
 
+## Multi-page (OutputStream)
+
+```kotlin
+fun renderToPdf(
+    outputStream: OutputStream,
+    pages: Int,
+    config: PdfPageConfig = PdfPageConfig.A4,
+    density: Density = Density(2f),
+    mode: RenderMode = RenderMode.VECTOR,
+    defaultFontFamily: FontFamily? = InterFontFamily,
+    content: @Composable (pageIndex: Int) -> Unit,
+)
+```
+
+Streaming variant of the multi-page API. Writes the PDF directly to `outputStream`. The stream is **not closed** by this function.
+
+Parameters and behavior are identical to the `ByteArray` multi-page variant above.
+
+### Example
+
+```kotlin
+call.respondOutputStream(ContentType.Application.Pdf) {
+    renderToPdf(this, pages = 3, config = PdfPageConfig.A4WithMargins) { pageIndex ->
+        PageContent(pageIndex)
+    }
+}
+```
+
+---
+
 ## Thread safety
 
 Both overloads are **not thread-safe**. Concurrent calls should be serialized externally (e.g., via a `Mutex` or single-threaded `Dispatchers`).
@@ -134,3 +200,5 @@ Both overloads are **not thread-safe**. Concurrent calls should be serialized ex
 
 - [Usage: Single Page]({{ site.baseurl }}/usage/single-page)
 - [Usage: Multi-page]({{ site.baseurl }}/usage/multi-page)
+- [Usage: Auto-pagination]({{ site.baseurl }}/usage/auto-pagination)
+- [Guide: Server-side & Ktor]({{ site.baseurl }}/guides/server-side)

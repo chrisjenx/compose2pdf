@@ -11,6 +11,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## 0.2.0
+
+### Added
+
+- **Auto-pagination** -- `renderToPdf` now automatically splits content across pages when it overflows (default behavior via `PdfPagination.AUTO`)
+- **OutputStream overloads** -- `renderToPdf(outputStream)` variants stream PDFs directly to any `OutputStream`, avoiding extra `ByteArray` copies. Ideal for Ktor and server-side usage
+- `PdfPagination` enum -- `AUTO` (default) or `SINGLE_PAGE`
+- Smart page breaking -- direct children are treated as "keep-together" units
+- Warning logs when auto-pagination truncates at 100-page limit
+- Warning logs for malformed SVG elements (missing attributes on rect, circle, ellipse, image)
+- Improved error messages -- `Compose2PdfException` used consistently for rendering failures
+
+### Changed
+
+- `renderToPdf` ByteArray variants now delegate to OutputStream variants internally
+- `PdfRenderer` internals return `PDDocument` instead of `ByteArray` for better composability
+- Cached `DocumentBuilderFactory` in SVG parser (performance improvement for multi-page documents)
+- Cached inline style attribute parsing per element (performance improvement)
+
+---
+
 ## 0.1.0
 
 Initial release.

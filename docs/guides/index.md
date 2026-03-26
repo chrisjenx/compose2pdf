@@ -16,3 +16,4 @@ In-depth guides for getting the most out of compose2pdf.
 | [Troubleshooting]({{ site.baseurl }}/guides/troubleshooting) | Common issues and solutions |
 | [Architecture]({{ site.baseurl }}/guides/architecture) | How compose2pdf works under the hood |
 | [Supported Features]({{ site.baseurl }}/guides/supported-features) | Complete Compose feature support matrix |
+| [Server-side & Ktor]({{ site.baseurl }}/guides/server-side) | Streaming PDFs to HTTP responses, concurrency, Ktor integration |

@@ -91,7 +91,10 @@ Comprehensive matrix of Compose feature support in compose2pdf's vector and rast
 | `PdfLink` annotations | Full | Full | Clickable URLs in PDF |
 | `PdfRoundedCornerShape` | Full | Full | PDF-safe asymmetric corners |
 | `InterFontFamily` | Full | N/A | Font embedding (vector only) |
-| Multi-page documents | Full | Full | |
+| Multi-page documents | Full | Full | Manual pagination with known page count |
+| Auto-pagination | Full | Full | Content automatically flows across pages (up to 100) |
+| `OutputStream` streaming | Full | Full | Write PDF directly to a stream (Ktor, servlets, files) |
+| `PdfPagination.SINGLE_PAGE` | Full | Full | Clip content to one page (opt-in) |
 
 ---
 
@@ -106,6 +109,8 @@ Comprehensive matrix of Compose feature support in compose2pdf's vector and rast
 | Animation | N/A | N/A | Static snapshot only |
 | `TextField` (input) | No | No | PDF is static output |
 | `DropdownMenu` | No | No | Interactive component |
+| Variable fonts | No | No | Skipped by font resolver; use static .ttf/.otf |
+| Per-page headers/footers (auto-pagination) | No | No | Use manual pagination for fixed page chrome |
 
 {: .note }
 "Limited" for gradients in vector mode means Skia may rasterize the gradient area before emitting it as SVG, resulting in a bitmap section within an otherwise vector PDF. Raster mode handles gradients pixel-perfectly.

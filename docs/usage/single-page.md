@@ -88,20 +88,27 @@ val pdf = renderToPdf(
 
 ---
 
-## Saving to a file
+## Saving and streaming
 
-`renderToPdf` returns a `ByteArray`. Write it anywhere:
+`renderToPdf` returns a `ByteArray`, or you can stream directly to an `OutputStream`:
 
 ```kotlin
-// To a file
+// ByteArray -- simple, works everywhere
+val pdfBytes = renderToPdf { MyContent() }
 File("report.pdf").writeBytes(pdfBytes)
 
-// To an output stream
-outputStream.write(pdfBytes)
+// OutputStream -- avoids extra copy for large PDFs
+FileOutputStream("report.pdf").use { out ->
+    renderToPdf(out) { MyContent() }
+}
 
-// As an HTTP response (e.g., Ktor)
-call.respondBytes(pdfBytes, ContentType.Application.Pdf)
+// Ktor -- stream directly to the HTTP response
+call.respondOutputStream(ContentType.Application.Pdf) {
+    renderToPdf(this) { MyContent() }
+}
 ```
+
+See [Server-side & Ktor]({{ site.baseurl }}/guides/server-side) for more integration patterns.
 
 ---
 

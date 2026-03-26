@@ -49,7 +49,9 @@ Compose Multiplatform compatibility matrix (`.github/workflows/compatibility.yml
 
 ```kotlin
 renderToPdf(config, density, mode, defaultFontFamily, pagination) { content } → ByteArray  // auto-paginates by default
+renderToPdf(outputStream, config, density, mode, defaultFontFamily, pagination) { content }  // streaming variant
 renderToPdf(pages, config, density, mode, defaultFontFamily) { pageIndex → content } → ByteArray  // manual pages
+renderToPdf(outputStream, pages, config, density, mode, defaultFontFamily) { pageIndex → content }  // streaming variant
 PdfLink(href) { content }
 PdfRoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)
 Shape.asPdfSafe()
