@@ -99,20 +99,28 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Create tag
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "compose2pdf-release-bot[bot]"
+          git config user.email "compose2pdf-release-bot[bot]@users.noreply.github.com"
           git tag -a "v${{ inputs.version }}" -m "Release ${{ inputs.version }}"
           git push origin "v${{ inputs.version }}"
 
       - name: Create GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           gh release create "v${{ inputs.version }}" \
             --title "v${{ inputs.version }}" \
