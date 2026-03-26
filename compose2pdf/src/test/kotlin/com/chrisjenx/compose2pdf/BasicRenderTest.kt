@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.apache.pdfbox.Loader
 import androidx.compose.ui.unit.Density
+import java.io.ByteArrayOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -92,6 +93,47 @@ class BasicRenderTest {
     fun `multi-page renderToPdf with zero density throws`() {
         assertFailsWith<IllegalArgumentException> {
             renderToPdf(pages = 1, density = Density(0f)) { Text("boom") }
+        }
+    }
+
+    // --- OutputStream overloads ---
+
+    @Test
+    fun `renderToPdf writes to OutputStream`() {
+        val baos = ByteArrayOutputStream()
+        renderToPdf(baos) {
+            Text("Hello, streaming!")
+        }
+        assertTrue(baos.size() > 0, "OutputStream should have data")
+        val header = baos.toByteArray().copyOfRange(0, 5).toString(Charsets.US_ASCII)
+        assertTrue(header.startsWith("%PDF"), "Should produce valid PDF, got: $header")
+    }
+
+    @Test
+    fun `multi-page renderToPdf writes to OutputStream`() {
+        val baos = ByteArrayOutputStream()
+        renderToPdf(baos, pages = 3) { pageIndex ->
+            Text("Page $pageIndex")
+        }
+        Loader.loadPDF(baos.toByteArray()).use { doc ->
+            assertEquals(3, doc.numberOfPages)
+        }
+    }
+
+    @Test
+    fun `renderToPdf OutputStream with custom config`() {
+        val baos = ByteArrayOutputStream()
+        renderToPdf(baos, config = PdfPageConfig.Letter, mode = RenderMode.VECTOR) {
+            Text("Letter page via stream")
+        }
+        assertTrue(baos.size() > 0)
+    }
+
+    @Test
+    fun `renderToPdf OutputStream wraps errors in Compose2PdfException`() {
+        val baos = ByteArrayOutputStream()
+        assertFailsWith<IllegalArgumentException> {
+            renderToPdf(baos, pages = 0) { Text("nope") }
         }
     }
 }

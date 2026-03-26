@@ -4,11 +4,61 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
 import com.chrisjenx.compose2pdf.internal.PdfRenderer
+import java.io.ByteArrayOutputStream
+import java.io.OutputStream
 
 /**
  * Exception thrown when PDF rendering fails.
  */
 class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+/**
+ * Renders Compose content to a PDF and writes it to [outputStream].
+ *
+ * This is the streaming variant — it writes the PDF directly to the given [OutputStream]
+ * without creating an intermediate `ByteArray`. Useful for server-side frameworks like Ktor:
+ * ```
+ * call.respondOutputStream(ContentType.Application.Pdf) {
+ *     renderToPdf(this) { MyContent() }
+ * }
+ * ```
+ *
+ * With [PdfPagination.AUTO] (the default), content is automatically split across multiple
+ * pages. Direct children of [content] are treated as "keep-together" units — if a child
+ * would straddle a page boundary, it is pushed to the next page.
+ *
+ * @param outputStream The stream to write the PDF to. Not closed by this function.
+ * @param config Page size and margins. Defaults to A4.
+ * @param density Controls the pixel resolution used during Compose layout. 2f is a good default.
+ * @param mode Vector (SVG-based) or raster rendering. Defaults to VECTOR.
+ * @param defaultFontFamily The default text font family. Defaults to [InterFontFamily] (bundled Inter).
+ * @param pagination Controls page splitting. Defaults to [PdfPagination.AUTO].
+ * @param content The composable content to render.
+ * @throws Compose2PdfException if rendering fails.
+ *
+ * **Thread safety**: This function is not thread-safe. Concurrent calls should be
+ * serialized externally (e.g., via a mutex or single-threaded dispatcher).
+ */
+fun renderToPdf(
+    outputStream: OutputStream,
+    config: PdfPageConfig = PdfPageConfig.A4,
+    density: Density = Density(2f),
+    mode: RenderMode = RenderMode.VECTOR,
+    defaultFontFamily: FontFamily? = InterFontFamily,
+    pagination: PdfPagination = PdfPagination.AUTO,
+    content: @Composable () -> Unit,
+) {
+    try {
+        val doc = PdfRenderer.renderSinglePage(config, density, mode, defaultFontFamily, pagination, content)
+        doc.use { it.save(outputStream) }
+    } catch (e: Compose2PdfException) {
+        throw e
+    } catch (e: IllegalArgumentException) {
+        throw e
+    } catch (e: Exception) {
+        throw Compose2PdfException("Failed to render PDF: ${e.message}", e)
+    }
+}
 
 /**
  * Renders Compose content to a PDF, automatically paginating when content overflows.
@@ -45,14 +95,47 @@ fun renderToPdf(
     pagination: PdfPagination = PdfPagination.AUTO,
     content: @Composable () -> Unit,
 ): ByteArray {
+    val baos = ByteArrayOutputStream()
+    renderToPdf(baos, config, density, mode, defaultFontFamily, pagination, content)
+    return baos.toByteArray()
+}
+
+/**
+ * Renders multiple pages of Compose content to a PDF and writes it to [outputStream].
+ *
+ * This is the streaming variant — it writes the PDF directly to the given [OutputStream].
+ *
+ * @param outputStream The stream to write the PDF to. Not closed by this function.
+ * @param pages Number of pages to render.
+ * @param config Page size and margins. Defaults to A4.
+ * @param density Controls the pixel resolution used during Compose layout. 2f is a good default.
+ * @param mode Vector (SVG-based) or raster rendering. Defaults to VECTOR.
+ * @param defaultFontFamily The default text font family. Defaults to [InterFontFamily] (bundled Inter).
+ * @param content The composable content for each page. Receives the zero-based page index.
+ * @throws Compose2PdfException if rendering fails.
+ * @throws IllegalArgumentException if [pages] is not positive.
+ *
+ * **Thread safety**: This function is not thread-safe. Concurrent calls should be
+ * serialized externally (e.g., via a mutex or single-threaded dispatcher).
+ */
+fun renderToPdf(
+    outputStream: OutputStream,
+    pages: Int,
+    config: PdfPageConfig = PdfPageConfig.A4,
+    density: Density = Density(2f),
+    mode: RenderMode = RenderMode.VECTOR,
+    defaultFontFamily: FontFamily? = InterFontFamily,
+    content: @Composable (pageIndex: Int) -> Unit,
+) {
     try {
-        return PdfRenderer.renderSinglePage(config, density, mode, defaultFontFamily, pagination, content)
+        val doc = PdfRenderer.renderMultiPage(pages, config, density, mode, defaultFontFamily, content)
+        doc.use { it.save(outputStream) }
     } catch (e: Compose2PdfException) {
         throw e
     } catch (e: IllegalArgumentException) {
-        throw e // Don't wrap precondition failures
+        throw e
     } catch (e: Exception) {
-        throw Compose2PdfException("Failed to render PDF: ${e.message}", e)
+        throw Compose2PdfException("Failed to render multi-page PDF: ${e.message}", e)
     }
 }
 
@@ -89,13 +172,7 @@ fun renderToPdf(
     defaultFontFamily: FontFamily? = InterFontFamily,
     content: @Composable (pageIndex: Int) -> Unit,
 ): ByteArray {
-    try {
-        return PdfRenderer.renderMultiPage(pages, config, density, mode, defaultFontFamily, content)
-    } catch (e: Compose2PdfException) {
-        throw e
-    } catch (e: IllegalArgumentException) {
-        throw e // Don't wrap precondition failures
-    } catch (e: Exception) {
-        throw Compose2PdfException("Failed to render multi-page PDF: ${e.message}", e)
-    }
+    val baos = ByteArrayOutputStream()
+    renderToPdf(baos, pages, config, density, mode, defaultFontFamily, content)
+    return baos.toByteArray()
 }

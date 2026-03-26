@@ -28,7 +28,6 @@ import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDBorderStyleDictionary
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
 internal object PdfRenderer {
@@ -39,6 +38,10 @@ internal object PdfRenderer {
     // Compose Constraints max dimension is ~262143px. Stay well under that limit.
     private const val MAX_MEASURE_HEIGHT_PX = 200_000
 
+    /**
+     * Renders single-page content to a [PDDocument]. The caller is responsible for
+     * saving and closing the returned document.
+     */
     fun renderSinglePage(
         config: PdfPageConfig,
         density: Density,
@@ -46,7 +49,7 @@ internal object PdfRenderer {
         defaultFontFamily: FontFamily?,
         pagination: PdfPagination,
         content: @Composable () -> Unit,
-    ): ByteArray {
+    ): PDDocument {
         return when (pagination) {
             PdfPagination.SINGLE_PAGE -> renderMultiPage(
                 pageCount = 1,
@@ -63,6 +66,10 @@ internal object PdfRenderer {
         }
     }
 
+    /**
+     * Renders multi-page content to a [PDDocument]. The caller is responsible for
+     * saving and closing the returned document.
+     */
     fun renderMultiPage(
         pageCount: Int,
         config: PdfPageConfig,
@@ -70,7 +77,7 @@ internal object PdfRenderer {
         mode: RenderMode,
         defaultFontFamily: FontFamily?,
         content: @Composable (pageIndex: Int) -> Unit,
-    ): ByteArray {
+    ): PDDocument {
         require(pageCount > 0) { "pageCount must be positive, was $pageCount" }
         return when (mode) {
             RenderMode.VECTOR -> renderVector(pageCount, config, density, defaultFontFamily, content)
@@ -114,7 +121,7 @@ internal object PdfRenderer {
         density: Density,
         defaultFontFamily: FontFamily?,
         content: @Composable () -> Unit,
-    ): ByteArray {
+    ): PDDocument {
         val measuredHeightPx = measureForPagination(config, density, defaultFontFamily, content)
             ?: return renderVector(1, config, density, defaultFontFamily) { content() }
 
@@ -140,18 +147,14 @@ internal object PdfRenderer {
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
         val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
-        try {
-            SvgToPdfConverter.addAutoPages(
-                pdfDoc, result.svg, pageLayout, totalContentHeightPt,
-                density.density, MAX_AUTO_PAGES, fontCache, imageCache,
-            )
+        SvgToPdfConverter.addAutoPages(
+            pdfDoc, result.svg, pageLayout, totalContentHeightPt,
+            density.density, MAX_AUTO_PAGES, fontCache, imageCache,
+        )
 
-            distributeLinks(pdfDoc, config, linkCollector.links, config.contentHeight.value)
+        distributeLinks(pdfDoc, config, linkCollector.links, config.contentHeight.value)
 
-            return pdfDoc.toByteArray()
-        } finally {
-            pdfDoc.close()
-        }
+        return pdfDoc
     }
 
     private fun renderAutoRaster(
@@ -159,7 +162,7 @@ internal object PdfRenderer {
         density: Density,
         defaultFontFamily: FontFamily?,
         content: @Composable () -> Unit,
-    ): ByteArray {
+    ): PDDocument {
         val measuredHeightPx = measureForPagination(config, density, defaultFontFamily, content)
             ?: return renderRaster(1, config, density, defaultFontFamily) { content() }
 
@@ -183,21 +186,17 @@ internal object PdfRenderer {
         val pageCount = rawPageCount.coerceIn(1, MAX_AUTO_PAGES)
 
         val doc = PDDocument()
-        try {
-            for (pageIndex in 0 until pageCount) {
-                val sliceTop = pageIndex * contentHeightPx
-                val sliceHeight = minOf(contentHeightPx, measuredHeightPx - sliceTop)
-                if (sliceHeight <= 0) break
-                val slice = fullBitmap.getSubimage(0, sliceTop, contentWidthPx, sliceHeight)
-                addBitmapPage(doc, config, slice)
-            }
-
-            distributeLinks(doc, config, linkCollector.links, config.contentHeight.value)
-
-            return doc.toByteArray()
-        } finally {
-            doc.close()
+        for (pageIndex in 0 until pageCount) {
+            val sliceTop = pageIndex * contentHeightPx
+            val sliceHeight = minOf(contentHeightPx, measuredHeightPx - sliceTop)
+            if (sliceHeight <= 0) break
+            val slice = fullBitmap.getSubimage(0, sliceTop, contentWidthPx, sliceHeight)
+            addBitmapPage(doc, config, slice)
         }
+
+        distributeLinks(doc, config, linkCollector.links, config.contentHeight.value)
+
+        return doc
     }
 
     // --- Manual multi-page ---
@@ -208,28 +207,24 @@ internal object PdfRenderer {
         density: Density,
         defaultFontFamily: FontFamily?,
         content: @Composable (pageIndex: Int) -> Unit,
-    ): ByteArray {
+    ): PDDocument {
         val pxW = config.contentWidthPx(density)
         val pxH = config.contentHeightPx(density)
 
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
         val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
-        try {
-            for (pageIndex in 0 until pageCount) {
-                val linkCollector = PdfLinkCollector()
-                val svg = ComposeToSvg.render(pxW, pxH, density) {
-                    WrapContent(defaultFontFamily, linkCollector) {
-                        content(pageIndex)
-                    }
+        for (pageIndex in 0 until pageCount) {
+            val linkCollector = PdfLinkCollector()
+            val svg = ComposeToSvg.render(pxW, pxH, density) {
+                WrapContent(defaultFontFamily, linkCollector) {
+                    content(pageIndex)
                 }
-                SvgToPdfConverter.addPage(pdfDoc, svg, config.width.value, config.height.value, fontCache, imageCache)
-                addLinkAnnotations(pdfDoc.getPage(pageIndex), config, linkCollector.links)
             }
-            return pdfDoc.toByteArray()
-        } finally {
-            pdfDoc.close()
+            SvgToPdfConverter.addPage(pdfDoc, svg, config.width.value, config.height.value, fontCache, imageCache)
+            addLinkAnnotations(pdfDoc.getPage(pageIndex), config, linkCollector.links)
         }
+        return pdfDoc
     }
 
     private fun renderRaster(
@@ -238,31 +233,27 @@ internal object PdfRenderer {
         density: Density,
         defaultFontFamily: FontFamily?,
         content: @Composable (pageIndex: Int) -> Unit,
-    ): ByteArray {
+    ): PDDocument {
         val contentWidthPx = config.contentWidthPx(density)
         val contentHeightPx = config.contentHeightPx(density)
 
         val doc = PDDocument()
-        try {
-            for (pageIndex in 0 until pageCount) {
-                val linkCollector = PdfLinkCollector()
-                val bitmap = renderComposeToBitmap(
-                    width = contentWidthPx,
-                    height = contentHeightPx,
-                    density = density,
-                    content = {
-                        WrapContent(defaultFontFamily, linkCollector) {
-                            content(pageIndex)
-                        }
-                    },
-                )
-                addBitmapPage(doc, config, bitmap)
-                addLinkAnnotations(doc.getPage(pageIndex), config, linkCollector.links)
-            }
-            return doc.toByteArray()
-        } finally {
-            doc.close()
+        for (pageIndex in 0 until pageCount) {
+            val linkCollector = PdfLinkCollector()
+            val bitmap = renderComposeToBitmap(
+                width = contentWidthPx,
+                height = contentHeightPx,
+                density = density,
+                content = {
+                    WrapContent(defaultFontFamily, linkCollector) {
+                        content(pageIndex)
+                    }
+                },
+            )
+            addBitmapPage(doc, config, bitmap)
+            addLinkAnnotations(doc.getPage(pageIndex), config, linkCollector.links)
         }
+        return doc
     }
 
     // --- Content wrapping ---
@@ -406,10 +397,4 @@ internal object PdfRenderer {
 
     private fun PdfPageConfig.contentHeightPx(density: Density): Int =
         (contentHeight.value * density.density).toInt()
-
-    private fun PDDocument.toByteArray(): ByteArray {
-        val baos = ByteArrayOutputStream()
-        save(baos)
-        return baos.toByteArray()
-    }
 }
