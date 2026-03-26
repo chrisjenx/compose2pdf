@@ -1,0 +1,54 @@
+name: Snapshot Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'compose2pdf/src/**/*.kt'
+      - 'compose2pdf/build.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/libs.versions.toml'
+      - 'build.gradle.kts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snapshot-publish
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify SNAPSHOT version
+        run: |
+          VERSION=$(grep '^version=' gradle.properties | cut -d'=' -f2)
+          echo "Version: $VERSION"
+          if [[ ! "$VERSION" =~ -SNAPSHOT$ ]]; then
+            echo "::error::Version '$VERSION' is not a SNAPSHOT. Use the Release workflow instead."
+            exit 1
+          fi
+
+      - name: Build and test
+        run: xvfb-run ./gradlew :compose2pdf:build :compose2pdf:test :fidelity-test:test
+
+      - name: Publish snapshot
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew publishAllPublicationsToMavenCentralRepository
