@@ -36,7 +36,7 @@ publishing {
             pom {
                 name.set("compose2pdf")
                 description.set("Render Compose Desktop content to PDF")
-                url.set("https://github.com/nickhall-ck/compose2pdf")
+                url.set("https://github.com/chrisjenx/compose2pdf")
                 licenses {
                     license {
                         name.set("Apache-2.0")
@@ -50,25 +50,21 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/nickhall-ck/compose2pdf")
-                    connection.set("scm:git:git://github.com/nickhall-ck/compose2pdf.git")
+                    url.set("https://github.com/chrisjenx/compose2pdf")
+                    connection.set("scm:git:git://github.com/chrisjenx/compose2pdf.git")
                 }
-            }
-        }
-    }
-    repositories {
-        maven {
-            name = "sonatype"
-            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-            credentials {
-                username = findProperty("ossrhUsername")?.toString()
-                password = findProperty("ossrhPassword")?.toString()
             }
         }
     }
 }
 
 signing {
-    isRequired = findProperty("signing.keyId") != null
+    val signingKeyId: String? by project
+    val signingKey: String? by project
+    val signingPassword: String? by project
+    if (signingKey != null) {
+        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    }
+    isRequired = signingKey != null || findProperty("signing.keyId") != null
     sign(publishing.publications["maven"])
 }
