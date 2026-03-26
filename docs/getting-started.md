@@ -25,7 +25,7 @@ If you don't have a Compose Desktop project yet, follow the [JetBrains Compose M
 
 ```kotlin
 dependencies {
-    implementation("com.chrisjenx:compose2pdf:0.1.0")
+    implementation("com.chrisjenx:compose2pdf:1.0.0")
 }
 ```
 
@@ -33,7 +33,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'com.chrisjenx:compose2pdf:0.1.0'
+    implementation 'com.chrisjenx:compose2pdf:1.0.0'
 }
 ```
 

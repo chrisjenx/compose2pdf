@@ -11,6 +11,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## 1.0.0
+
+Initial public release.
+
+### Added
+
+- **Compose-to-PDF rendering** -- render Compose Desktop content to production-quality vector PDFs with embedded fonts
+- **Auto-pagination** -- content automatically splits across pages with smart page breaking that keeps children together
+- **Manual multi-page** -- explicit page control via `renderToPdf(pages = N) { pageIndex -> ... }`
+- **OutputStream streaming** -- stream PDFs directly to any `OutputStream` for server-side use (Ktor, Spring, Servlet)
+- **Clickable links** -- `PdfLink(href)` composable adds PDF link annotations
+- **Raster fallback** -- `RenderMode.RASTER` for pixel-perfect output when vector fidelity isn't needed
+- **Bundled Inter font** -- `InterFontFamily` included for consistent cross-platform rendering
+- **PDF-safe shapes** -- `PdfRoundedCornerShape` and `Shape.asPdfSafe()` for accurate non-uniform rounded corners
+- **Page presets** -- A4, Letter, A3 with margin variants and `landscape()` support
+- **Snapshot publishing** -- SNAPSHOT builds auto-publish to Maven Central on push to main
+
 ## 0.2.0
 
 ### Added

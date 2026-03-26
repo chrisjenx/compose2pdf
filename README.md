@@ -37,7 +37,7 @@ File("hello.pdf").writeBytes(pdfBytes)
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.chrisjenx:compose2pdf:0.1.0")
+    implementation("com.chrisjenx:compose2pdf:1.0.0")
 }
 ```
 
