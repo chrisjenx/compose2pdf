@@ -94,6 +94,9 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 
 ## Gotchas
 
+### Docs Site
+- **URL structure** — standalone pages (`getting-started.md`) produce `/page.html` URLs; directory index pages (`usage/index.md`) produce `/directory/` URLs. Don't use trailing slashes for standalone pages.
+
 ### Rendering
 - **`@InternalComposeUiApi` opt-in required** — `CanvasLayersComposeScene` is internal Compose API
 - **Variable fonts excluded** — `FontResolver.isVariableFont()` skips fonts with `fvar` table
