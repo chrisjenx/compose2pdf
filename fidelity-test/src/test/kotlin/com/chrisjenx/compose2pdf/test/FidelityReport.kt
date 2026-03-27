@@ -29,7 +29,18 @@ data class FidelityResult(
     // PDF file paths (relative to report dir)
     val vectorPdfPath: String = "",
     val rasterPdfPath: String = "",
+    // Android cross-platform comparison (optional)
+    val androidPath: String = "",
+    val androidDiffPath: String = "",
+    val androidPdfPath: String = "",
+    val androidRmse: Double = -1.0,
+    val androidSsim: Double = -1.0,
+    val androidExactMatch: Double = -1.0,
+    val androidMaxError: Double = -1.0,
+    val androidStatus: Status = Status.SKIPPED,
 ) {
+    val hasAndroid: Boolean get() = androidStatus != Status.SKIPPED
+
     val rowStatus: Status
         get() {
             val statuses = listOf(vectorStatus, rasterStatus)
@@ -339,6 +350,30 @@ h1 { margin: 0 0 4px 0; font-size: 24px; }
             appendLine("<div class='metric-row'><span class='metric-label'>Status</span><span class='metric-value $rStatusClass'>${result.rasterStatus.label}</span></div>")
             appendLine("</div>")
             appendLine("</div></div>")
+
+            // Android section (if available)
+            if (result.hasAndroid) {
+                val aStatusClass = "${result.androidStatus.cssClass}-text"
+                appendLine("<div class='mode-section'>")
+                appendLine("<div class='mode-label'>Android</div>")
+                appendLine("<div class='mode-content'>")
+                appendLine("<div class='mode-images'>")
+                appendLine("<div class='img-group'><div class='img-label'>Rendered</div><img class='thumb' src='${escapeHtml(result.androidPath)}' onclick='openModal(this.src)'>")
+                if (result.androidPdfPath.isNotEmpty()) {
+                    appendLine("<a href='${escapeHtml(result.androidPdfPath)}' class='pdf-link' target='_blank'>Open PDF</a>")
+                }
+                appendLine("</div>")
+                appendLine("<div class='img-group'><div class='img-label'>Diff</div><img class='thumb' src='${escapeHtml(result.androidDiffPath)}' onclick='openModal(this.src)'></div>")
+                appendLine("</div>")
+                appendLine("<div class='mode-metrics'>")
+                appendLine("<div class='metric-row'><span class='metric-label'>RMSE</span><span class='metric-value'>${"%.4f".format(result.androidRmse)}</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>SSIM</span><span class='metric-value'>${"%.4f".format(result.androidSsim)}</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>Match</span><span class='metric-value'>${"%.2f".format(result.androidExactMatch * 100)}%</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>MaxErr</span><span class='metric-value'>${"%.4f".format(result.androidMaxError)}</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>Status</span><span class='metric-value $aStatusClass'>${result.androidStatus.label}</span></div>")
+                appendLine("</div>")
+                appendLine("</div></div>")
+            }
 
             appendLine("</div>") // modes-col
             appendLine("</div>") // card-body
