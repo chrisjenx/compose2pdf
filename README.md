@@ -128,12 +128,12 @@ compose2pdf renders Compose content through a **Skia SVGCanvas → Apache PDFBox
 
 **[Full documentation](https://chrisjenx.github.io/compose2pdf/)** — getting started, usage guides, API reference, examples, and more.
 
-- [Getting Started](https://chrisjenx.github.io/compose2pdf/getting-started/)
+- [Getting Started](https://chrisjenx.github.io/compose2pdf/getting-started.html)
 - [Usage Guide](https://chrisjenx.github.io/compose2pdf/usage/)
 - [API Reference](https://chrisjenx.github.io/compose2pdf/api/)
 - [Examples](https://chrisjenx.github.io/compose2pdf/examples/)
-- [Compatibility](https://chrisjenx.github.io/compose2pdf/compatibility/)
-- [Troubleshooting](https://chrisjenx.github.io/compose2pdf/guides/troubleshooting/)
+- [Compatibility](https://chrisjenx.github.io/compose2pdf/compatibility.html)
+- [Troubleshooting](https://chrisjenx.github.io/compose2pdf/guides/troubleshooting.html)
 
 ## License
 
