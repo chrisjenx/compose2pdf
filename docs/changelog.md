@@ -11,6 +11,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## 2.0.0
+
+### Added
+
+- **Kotlin Multiplatform** -- compose2pdf now targets JVM, Android, and iOS
+- **Android support** -- renders PDFs via `android.graphics.pdf.PdfDocument` (zero external dependencies). Suspend API with `Context` parameter. Always produces vector output
+- **iOS support** -- renders PDFs via Core Graphics (`CGPDFContext`). Supports iosArm64, iosX64, and iosSimulatorArm64 targets
+- **Auto-pagination on all platforms** -- content automatically flows across pages on JVM, Android, and iOS
+- **`test-fixtures` module** -- shared multiplatform test utilities for JVM, Android, and iOS
+
+### Changed
+
+- **Artifact structure** -- the single `compose2pdf` JVM artifact is now a KMP metadata module. Platform-specific artifacts are `compose2pdf-jvm`, `compose2pdf-android`, and `compose2pdf-iosarm64`/`iosx64`/`iossimulatorarm64`. Existing consumers using `implementation("com.chrisjenx:compose2pdf:...")` continue to work via Gradle Module Metadata (Gradle 6.0+)
+- **CI** -- added Android SDK setup, iOS simulator tests on macOS, and updated publish workflows to run on macOS for full KMP target support
+- **Security** -- added XXE/DTD prevention to DocumentBuilderFactory in SVG parser (defense-in-depth)
+
+### Platform limitations
+
+| Feature | JVM | Android | iOS |
+|:--------|:---:|:-------:|:---:|
+| `RenderMode` (VECTOR/RASTER) | Yes | -- (always vector) | -- (always vector) |
+| `InterFontFamily` | Yes | -- | -- |
+| `PdfLink` annotations | Yes | -- | -- |
+| `OutputStream` streaming | Yes | Yes | -- |
+| Multi-page (manual) | Yes | -- | -- |
+| Synchronous API | Yes | -- (`suspend` only) | Yes |
+
+---
+
 ## 1.0.0
 
 Initial public release.

@@ -117,7 +117,15 @@ internal object SvgToPdfConverter {
     }
 
     private val documentBuilderFactory: DocumentBuilderFactory by lazy {
-        DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+        DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            // Defense-in-depth: disable external entities and DTDs.
+            // This parser only processes internally-generated SVG from Skia,
+            // but hardening prevents misuse if the API surface changes.
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        }
     }
 
     private fun parseSvg(svg: String): Pair<Element, Map<String, Element>> {

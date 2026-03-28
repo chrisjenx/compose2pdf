@@ -6,7 +6,10 @@ nav_order: 4
 
 # Supported Compose Features
 
-Comprehensive matrix of Compose feature support in compose2pdf's vector and raster rendering modes.
+Comprehensive matrix of Compose feature support across platforms and rendering modes.
+
+{: .note }
+The Vector/Raster columns below apply to **JVM only**. Android and iOS always produce vector output. Layout, text, shapes, and images are supported on all platforms.
 
 ---
 
@@ -88,13 +91,13 @@ Comprehensive matrix of Compose feature support in compose2pdf's vector and rast
 
 | Feature | Vector | Raster | Notes |
 |:--------|:------:|:------:|:------|
-| `PdfLink` annotations | Full | Full | Clickable URLs in PDF |
-| `PdfRoundedCornerShape` | Full | Full | PDF-safe asymmetric corners |
-| `InterFontFamily` | Full | N/A | Font embedding (vector only) |
-| Multi-page documents | Full | Full | Manual pagination with known page count |
-| Auto-pagination | Full | Full | Content automatically flows across pages (up to 100) |
-| `OutputStream` streaming | Full | Full | Write PDF directly to a stream (Ktor, servlets, files) |
-| `PdfPagination.SINGLE_PAGE` | Full | Full | Clip content to one page (opt-in) |
+| `PdfLink` annotations | Full | Full | JVM only — clickable URLs in PDF |
+| `PdfRoundedCornerShape` | Full | Full | All platforms |
+| `InterFontFamily` | Full | N/A | JVM only — font embedding (vector only) |
+| Multi-page documents | Full | Full | JVM only — manual pagination with known page count |
+| Auto-pagination | Full | Full | All platforms — content flows across pages (up to 100) |
+| `OutputStream` streaming | Full | Full | JVM and Android — write PDF directly to a stream |
+| `PdfPagination.SINGLE_PAGE` | Full | Full | All platforms — clip content to one page (opt-in) |
 
 ---
 

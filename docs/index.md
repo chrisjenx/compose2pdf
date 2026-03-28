@@ -2,12 +2,12 @@
 title: Home
 layout: home
 nav_order: 1
-description: "Kotlin JVM library for PDF generation from Compose Desktop — vector text, embedded fonts, auto-pagination, and server-side streaming with Ktor."
+description: "Kotlin Multiplatform library for PDF generation from Compose — vector text, embedded fonts, and auto-pagination on JVM, Android, and iOS."
 ---
 
-# compose2pdf — Kotlin PDF Library for Compose Desktop
+# compose2pdf — Kotlin Multiplatform PDF Library
 
-**Generate production-quality PDFs from Compose Desktop content** — vector text, embedded fonts, auto-pagination, and server-side streaming. A Kotlin JVM library that turns your `@Composable` functions into PDF documents.
+**Generate production-quality PDFs from Compose content on JVM/Desktop, Android, and iOS** — vector text, embedded fonts, and auto-pagination. A Kotlin Multiplatform library that turns your `@Composable` functions into PDF documents.
 {: .fs-6 .fw-300 }
 
 [Get Started]({{ site.baseurl }}/getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
@@ -53,15 +53,19 @@ That's it. `renderToPdf` takes a `@Composable` lambda and returns a `ByteArray`.
 
 Use the same Compose layout primitives you already know -- `Column`, `Row`, `Box`, `Text`, `Canvas` -- and get a production-quality PDF.
 
+### Multiplatform
+
+Works on JVM/Desktop, Android, and iOS. Each platform uses a native PDF pipeline for best performance and output quality.
+
 ### Vector PDFs
 
-Text is selectable, scales to any zoom level, and produces small files. Powered by Skia's SVGCanvas and Apache PDFBox.
+Text is selectable, scales to any zoom level, and produces small files. Powered by platform-native PDF engines (PDFBox on JVM, PdfDocument on Android, Core Graphics on iOS).
 
-### Raster Fallback
+### Raster Fallback (JVM)
 
 When you need pixel-perfect rendering -- complex gradients, visual effects, or exact bitmap output -- switch to raster mode with one parameter.
 
-### Font Embedding
+### Font Embedding (JVM)
 
 Ships with bundled Inter fonts (Regular, Bold, Italic, BoldItalic). Fonts are automatically subsetted and embedded so PDFs look the same everywhere.
 
@@ -73,24 +77,26 @@ No new DSL to learn. Write `@Composable` functions, pass them to `renderToPdf()`
 
 ## Features at a Glance
 
-| Feature | Description |
-|:--------|:------------|
-| **Vector output** | Selectable text, crisp at any zoom, small file size |
-| **Raster fallback** | Pixel-perfect rendering as an embedded image |
-| **Font embedding** | Bundled Inter fonts or system font resolution with automatic subsetting |
-| **Link annotations** | Clickable URLs in the PDF via `PdfLink` |
-| **Auto-pagination** | Content automatically flows across pages; elements kept together at boundaries |
-| **Multi-page** | Render multiple pages in a single PDF (automatic or manual) |
-| **Streaming output** | Write PDFs directly to an `OutputStream` for Ktor, servlets, or files |
-| **Page presets** | A4, Letter, A3 with configurable margins and landscape support |
-| **Shapes** | Backgrounds, borders, clips, rounded corners, Canvas drawing |
-| **Images** | Embed bitmap images with clipping and layout |
+| Feature | JVM | Android | iOS |
+|:--------|:----|:--------|:----|
+| **Vector output** | Yes (VECTOR/RASTER modes) | Yes (always vector) | Yes (always vector) |
+| **Auto-pagination** | Yes | Yes | Yes |
+| **Multi-page (manual)** | Yes | -- | -- |
+| **Font embedding** | Bundled Inter + system fonts | System fonts | System fonts |
+| **Link annotations** | Yes (`PdfLink`) | -- | -- |
+| **Streaming output** | `OutputStream` | `OutputStream` | -- |
+| **Page presets** | A4, Letter, A3 + margins + landscape | Same | Same |
+| **Shapes & images** | Full support | Full support | Full support |
 
 ---
 
 ## How it works
 
-compose2pdf renders your Compose content through a **Skia SVGCanvas → Apache PDFBox** pipeline. Compose Desktop's layout engine runs your composables, Skia captures the draw calls as SVG, and compose2pdf converts that to vector PDF commands with embedded fonts and link annotations.
+Each platform uses a native PDF pipeline:
+
+- **JVM**: Compose content is rendered through Skia SVGCanvas, producing SVG that is converted to PDF vector commands via Apache PDFBox with embedded fonts and link annotations.
+- **Android**: Compose content is rendered off-screen via a headless virtual display, drawn directly onto `android.graphics.pdf.PdfDocument`'s Skia-backed Canvas.
+- **iOS**: Compose content is rendered through Skia SVGCanvas, with SVG parsed via NSXMLParser and converted to PDF via Core Graphics (`CGPDFContext`).
 
 {: .note }
 **Want native PDF output from Skia?** [Skiko PR #775](https://github.com/JetBrains/skiko/pull/775) proposes adding a direct PDF backend to Skia/Skiko. This would eliminate the SVG intermediary — faster rendering, smaller files, and full gradient/effect support in vector mode. If this matters to you, upvote the PR!
@@ -99,6 +105,6 @@ compose2pdf renders your Compose content through a **Skia SVGCanvas → Apache P
 
 ## Requirements
 
-- **JDK 17** or later
-- **Kotlin** 2.x
-- **Compose Multiplatform** (Desktop) 1.9+
+- **JVM/Desktop**: JDK 17+, Kotlin 2.x, Compose Multiplatform 1.9+
+- **Android**: minSdk 24, Compose Multiplatform 1.9+
+- **iOS**: Compose Multiplatform 1.9+

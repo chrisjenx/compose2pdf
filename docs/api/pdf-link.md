@@ -71,6 +71,18 @@ PdfLink(href = "mailto:hello@example.com") {
 
 ---
 
+## Platform support
+
+| Platform | Status | Notes |
+|:---------|:-------|:------|
+| **JVM** | Full support | PDF link annotations added via PDFBox `PDAnnotationLink` |
+| **Android** | Not supported | `android.graphics.pdf.PdfDocument` has no annotation API. `PdfLink` is a no-op (content renders, but no clickable link in the PDF) |
+| **iOS** | Not supported | Core Graphics PDF context does not write link annotations. `PdfLink` is a no-op |
+
+The `PdfLink` composable is defined in `commonMain` and is safe to use in shared code — it simply has no effect on platforms that don't support PDF annotations.
+
+---
+
 ## See also
 
 - [Usage: Links]({{ site.baseurl }}/usage/links) -- All link patterns with examples

@@ -11,17 +11,30 @@ Generate your first PDF from Compose in under 5 minutes.
 
 ## Prerequisites
 
-- **JDK 17** or later
-- A **Compose Desktop** project (Compose Multiplatform)
+- A **Compose Multiplatform** project (Desktop, Android, or iOS)
 - **Gradle** build system
+- **JDK 17+** (for JVM/Desktop targets)
+- **Android minSdk 24+** (for Android targets)
 
-If you don't have a Compose Desktop project yet, follow the [JetBrains Compose Multiplatform getting started guide](https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-multiplatform-getting-started.html).
+If you don't have a Compose Multiplatform project yet, follow the [JetBrains Compose Multiplatform getting started guide](https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-multiplatform-getting-started.html).
 
 ---
 
 ## Add the dependency
 
-### Gradle (Kotlin DSL)
+### Kotlin Multiplatform
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.chrisjenx:compose2pdf:1.0.0")
+        }
+    }
+}
+```
+
+### JVM or Android only (Gradle Kotlin DSL)
 
 ```kotlin
 dependencies {
@@ -29,7 +42,7 @@ dependencies {
 }
 ```
 
-### Gradle (Groovy DSL)
+### Gradle Groovy DSL
 
 ```groovy
 dependencies {
@@ -42,6 +55,8 @@ The library is published to **Maven Central** -- no additional repository config
 ---
 
 ## Your first PDF
+
+### JVM/Desktop
 
 Create a Kotlin file (e.g., `GeneratePdf.kt`) and add:
 
@@ -77,11 +92,48 @@ Run it, and open `hello.pdf` in any PDF viewer. You'll see:
 - "Generated with compose2pdf" in smaller gray text
 - Selectable, vector text on an A4 page
 
+### Android
+
+```kotlin
+import com.chrisjenx.compose2pdf.renderToPdf
+import com.chrisjenx.compose2pdf.PdfPageConfig
+
+// In a ViewModel or coroutine scope:
+val pdfBytes = renderToPdf(
+    context = applicationContext,
+    config = PdfPageConfig.A4WithMargins,
+) {
+    Column(Modifier.fillMaxSize().padding(32.dp)) {
+        Text("Hello from Android!", fontSize = 28.sp)
+    }
+}
+// Save or share pdfBytes
+```
+
+{: .note }
+The Android API is `suspend` -- call it from a coroutine scope. It requires a `Context` parameter (any Context works, not just Activity).
+
+### iOS
+
+```kotlin
+import com.chrisjenx.compose2pdf.renderToPdf
+import com.chrisjenx.compose2pdf.PdfPageConfig
+
+val pdfBytes = renderToPdf(
+    config = PdfPageConfig.A4WithMargins,
+) {
+    Column(Modifier.fillMaxSize().padding(32.dp)) {
+        Text("Hello from iOS!", fontSize = 28.sp)
+    }
+}
+// Use pdfBytes with UIKit or share
+```
+
 ### What just happened?
 
 1. `renderToPdf { ... }` takes a `@Composable` lambda -- the same kind you write for Compose UI
-2. The library renders your composable through Skia's SVGCanvas, converts the SVG to PDF vector commands via PDFBox, and returns the PDF as a `ByteArray`
-3. Default settings: A4 page, no margins, vector mode, Inter font, 2x density
+2. The library renders your composable through a platform-native PDF pipeline and returns the PDF as a `ByteArray`
+3. Default settings: A4 page, no margins, vector mode, 2x density
 
 ---
 
@@ -91,13 +143,15 @@ Run it, and open `hello.pdf` in any PDF viewer. You'll see:
 val pdf = renderToPdf(
     config = PdfPageConfig.LetterWithMargins,   // US Letter with 1" margins
     density = Density(2f),                       // 2x pixel density
-    mode = RenderMode.VECTOR,                    // Vector output (default)
 ) {
     Column(Modifier.fillMaxSize()) {
         Text("Custom configuration", fontSize = 20.sp)
     }
 }
 ```
+
+{: .note }
+JVM additionally supports `mode = RenderMode.VECTOR` (default) or `RenderMode.RASTER`, and `defaultFontFamily = InterFontFamily` (bundled Inter fonts). These parameters are not available on Android or iOS.
 
 ---
 

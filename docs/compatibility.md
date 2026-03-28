@@ -24,7 +24,7 @@ This table is auto-updated weekly by CI. The compatibility workflow discovers th
 
 ---
 
-## JDK versions
+## JDK versions (JVM target)
 
 | JDK | Status |
 |:----|:-------|
@@ -37,24 +37,58 @@ JDK 17 is the minimum — enforced by `jvmToolchain(17)` in the build. Later JDK
 
 ## Platform support
 
+### JVM/Desktop
+
 | Platform | Status | Notes |
 |:---------|:-------|:------|
 | **macOS** (arm64, x64) | CI tested | Full support |
 | **Linux** (x64) | CI tested | Requires `xvfb-run` for headless Compose rendering |
 | **Windows** (x64) | Supported | Not CI tested, but Compose Desktop and PDFBox both support Windows |
 
-> compose2pdf targets **Compose Desktop** (JVM). Android, iOS, and Compose for Web are not supported.
+### Android
+
+| Requirement | Value |
+|:------------|:------|
+| **minSdk** | 24 (Android 7.0) |
+| **compileSdk** | 35 |
+| **API type** | `suspend fun` (requires coroutine scope) |
+| **Context** | Required (any Context, not just Activity) |
+
+### iOS
+
+| Target | Status |
+|:-------|:-------|
+| **iosArm64** | Supported (device) |
+| **iosX64** | Supported (Intel simulator) |
+| **iosSimulatorArm64** | CI tested (Apple Silicon simulator) |
+
+---
+
+## Platform feature matrix
+
+| Feature | JVM | Android | iOS |
+|:--------|:---:|:-------:|:---:|
+| Vector output | Yes | Yes | Yes |
+| Raster output (`RenderMode.RASTER`) | Yes | -- | -- |
+| Auto-pagination | Yes | Yes | Yes |
+| Multi-page (manual) | Yes | -- | -- |
+| `OutputStream` streaming | Yes | Yes | -- |
+| `PdfLink` annotations | Yes | -- | -- |
+| `InterFontFamily` (bundled Inter) | Yes | -- | -- |
+| `RenderMode` parameter | Yes | -- (always vector) | -- (always vector) |
+| Synchronous API | Yes | -- (`suspend` only) | Yes |
 
 ---
 
 ## Dependencies
 
-| Dependency | Version | Purpose |
-|:-----------|:--------|:--------|
-| Kotlin | 2.3.20 | Language |
-| Compose Multiplatform | 1.9+ | UI framework |
-| Apache PDFBox | 3.0.7 | PDF generation |
-| Kotlinx Coroutines | 1.10.2 | Compose runtime dependency |
+| Dependency | Version | Platforms | Purpose |
+|:-----------|:--------|:----------|:--------|
+| Kotlin | 2.3.20 | All | Language |
+| Compose Multiplatform | 1.9+ | All | UI framework |
+| Apache PDFBox | 3.0.7 | JVM only | PDF generation |
+| Kotlinx Coroutines | 1.10.2 | All | Compose runtime dependency |
+| Android Gradle Plugin | 8.9.3 | Android | Android build toolchain |
 
 ---
 

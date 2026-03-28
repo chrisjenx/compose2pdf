@@ -6,11 +6,27 @@ nav_order: 1
 
 # renderToPdf
 
-The primary entry point for PDF generation. Four overloads: auto-paginating and manual multi-page, each with `ByteArray` and `OutputStream` variants.
+The primary entry point for PDF generation. Platform-specific overloads are available on JVM, Android, and iOS.
 
 ---
 
-## Auto-paginating (default)
+## Platform comparison
+
+| Feature | JVM | Android | iOS |
+|:--------|:---:|:-------:|:---:|
+| `ByteArray` return | Yes | Yes | Yes |
+| `OutputStream` streaming | Yes | Yes | -- |
+| Multi-page (manual) | Yes | -- | -- |
+| `RenderMode` parameter | Yes | -- | -- |
+| `InterFontFamily` default | Yes | -- | -- |
+| `suspend` | No | Yes | No |
+| `Context` parameter | No | Yes | No |
+
+---
+
+## JVM
+
+### Auto-paginating (default)
 
 ```kotlin
 fun renderToPdf(
@@ -27,7 +43,7 @@ Renders Compose content to a PDF, automatically splitting across pages when cont
 
 With `PdfPagination.AUTO` (the default), direct children of `content` are treated as "keep-together" units — if a child would straddle a page boundary, it is pushed to the next page. A single child taller than a page flows continuously across pages.
 
-### Parameters
+#### Parameters
 
 | Parameter | Type | Default | Description |
 |:----------|:-----|:--------|:------------|
@@ -38,25 +54,24 @@ With `PdfPagination.AUTO` (the default), direct children of `content` are treate
 | `pagination` | `PdfPagination` | `PdfPagination.AUTO` | Controls page splitting. `AUTO` automatically paginates. `SINGLE_PAGE` clips to one page |
 | `content` | `@Composable () -> Unit` | -- | The composable content to render |
 
-### Returns
+#### Returns
 
 `ByteArray` -- a valid PDF document (one or more pages).
 
-### Throws
+#### Throws
 
 | Exception | When |
 |:----------|:-----|
 | [`Compose2PdfException`]({{ site.baseurl }}/api/exceptions) | Rendering fails (wraps the underlying cause) |
 | `IllegalArgumentException` | Precondition failures (not wrapped) |
 
-### Example
+#### Example
 
 ```kotlin
 val pdfBytes = renderToPdf(
     config = PdfPageConfig.LetterWithMargins,
     mode = RenderMode.VECTOR,
 ) {
-    // Direct children are "keep-together" units
     ReportHeader()
     DataTable(items)       // kept together on one page
     SummarySection()       // pushed to next page if needed
@@ -66,7 +81,7 @@ File("report.pdf").writeBytes(pdfBytes)
 
 ---
 
-## Auto-paginating (OutputStream)
+### Auto-paginating (OutputStream)
 
 ```kotlin
 fun renderToPdf(
@@ -84,7 +99,7 @@ Streaming variant -- writes the PDF directly to `outputStream` without creating 
 
 Parameters and behavior are identical to the `ByteArray` variant above.
 
-### Example
+#### Example
 
 ```kotlin
 // Ktor
@@ -102,7 +117,7 @@ FileOutputStream("report.pdf").use { out ->
 
 ---
 
-## Multi-page
+### Multi-page
 
 ```kotlin
 fun renderToPdf(
@@ -117,7 +132,7 @@ fun renderToPdf(
 
 Renders multiple pages of Compose content to a single PDF. The page count must be known upfront.
 
-### Parameters
+#### Parameters
 
 | Parameter | Type | Default | Description |
 |:----------|:-----|:--------|:------------|
@@ -128,18 +143,18 @@ Renders multiple pages of Compose content to a single PDF. The page count must b
 | `defaultFontFamily` | `FontFamily?` | [`InterFontFamily`]({{ site.baseurl }}/api/fonts) | Default font family |
 | `content` | `@Composable (pageIndex: Int) -> Unit` | -- | Content for each page. Receives the **zero-based** page index |
 
-### Returns
+#### Returns
 
 `ByteArray` -- a valid multi-page PDF document.
 
-### Throws
+#### Throws
 
 | Exception | When |
 |:----------|:-----|
 | [`Compose2PdfException`]({{ site.baseurl }}/api/exceptions) | Rendering fails |
 | `IllegalArgumentException` | `pages` is not positive |
 
-### Example
+#### Example
 
 ```kotlin
 val totalPages = 3
@@ -160,7 +175,7 @@ val pdfBytes = renderToPdf(
 
 ---
 
-## Multi-page (OutputStream)
+### Multi-page (OutputStream)
 
 ```kotlin
 fun renderToPdf(
@@ -178,12 +193,103 @@ Streaming variant of the multi-page API. Writes the PDF directly to `outputStrea
 
 Parameters and behavior are identical to the `ByteArray` multi-page variant above.
 
-### Example
+---
+
+## Android
+
+{: .note }
+The Android API requires a `Context` parameter and is `suspend` -- call it from a coroutine scope. Link annotations (`PdfLink`) are not supported on Android because `android.graphics.pdf.PdfDocument` does not expose annotation APIs.
+
+### Auto-paginating (ByteArray)
 
 ```kotlin
-call.respondOutputStream(ContentType.Application.Pdf) {
-    renderToPdf(this, pages = 3, config = PdfPageConfig.A4WithMargins) { pageIndex ->
-        PageContent(pageIndex)
+suspend fun renderToPdf(
+    context: Context,
+    config: PdfPageConfig = PdfPageConfig.A4,
+    density: Density = Density(2f),
+    defaultFontFamily: FontFamily? = null,
+    pagination: PdfPagination = PdfPagination.AUTO,
+    content: @Composable () -> Unit,
+): ByteArray
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|:----------|:-----|:--------|:------------|
+| `context` | `Context` | -- | Android context. Any Context works (not just Activity) |
+| `config` | [`PdfPageConfig`]({{ site.baseurl }}/api/pdf-page-config) | `PdfPageConfig.A4` | Page size and margins |
+| `density` | `Density` | `Density(2f)` | Pixel resolution for Compose layout |
+| `defaultFontFamily` | `FontFamily?` | `null` | Default font family. Pass `null` for system fonts |
+| `pagination` | `PdfPagination` | `PdfPagination.AUTO` | Controls page splitting |
+| `content` | `@Composable () -> Unit` | -- | The composable content to render |
+
+#### Example
+
+```kotlin
+val pdfBytes = renderToPdf(
+    context = applicationContext,
+    config = PdfPageConfig.LetterWithMargins,
+) {
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        Text("Invoice from Android", fontSize = 24.sp)
+    }
+}
+```
+
+### Auto-paginating (OutputStream)
+
+```kotlin
+suspend fun renderToPdf(
+    context: Context,
+    outputStream: OutputStream,
+    config: PdfPageConfig = PdfPageConfig.A4,
+    density: Density = Density(2f),
+    defaultFontFamily: FontFamily? = null,
+    pagination: PdfPagination = PdfPagination.AUTO,
+    content: @Composable () -> Unit,
+)
+```
+
+Streaming variant -- writes the PDF directly to `outputStream`. The stream is **not closed** by this function.
+
+---
+
+## iOS
+
+{: .note }
+The iOS API is synchronous and returns `ByteArray` only. There is no `OutputStream` streaming variant or manual multi-page API. Link annotations (`PdfLink`) are not currently supported on iOS.
+
+### Auto-paginating
+
+```kotlin
+fun renderToPdf(
+    config: PdfPageConfig = PdfPageConfig.A4,
+    density: Density = Density(2f),
+    defaultFontFamily: FontFamily? = null,
+    pagination: PdfPagination = PdfPagination.AUTO,
+    content: @Composable () -> Unit,
+): ByteArray
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|:----------|:-----|:--------|:------------|
+| `config` | [`PdfPageConfig`]({{ site.baseurl }}/api/pdf-page-config) | `PdfPageConfig.A4` | Page size and margins |
+| `density` | `Density` | `Density(2f)` | Pixel resolution for Compose layout |
+| `defaultFontFamily` | `FontFamily?` | `null` | Default font family. Pass `null` for system fonts |
+| `pagination` | `PdfPagination` | `PdfPagination.AUTO` | Controls page splitting |
+| `content` | `@Composable () -> Unit` | -- | The composable content to render |
+
+#### Example
+
+```kotlin
+val pdfBytes = renderToPdf(
+    config = PdfPageConfig.A4WithMargins,
+) {
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        Text("Invoice from iOS", fontSize = 24.sp)
     }
 }
 ```
@@ -192,7 +298,7 @@ call.respondOutputStream(ContentType.Application.Pdf) {
 
 ## Thread safety
 
-Both overloads are **not thread-safe**. Concurrent calls should be serialized externally (e.g., via a `Mutex` or single-threaded `Dispatchers`).
+All overloads on all platforms are **not thread-safe**. Concurrent calls should be serialized externally (e.g., via a `Mutex` or single-threaded `Dispatchers`).
 
 ---
 
@@ -201,4 +307,4 @@ Both overloads are **not thread-safe**. Concurrent calls should be serialized ex
 - [Usage: Single Page]({{ site.baseurl }}/usage/single-page)
 - [Usage: Multi-page]({{ site.baseurl }}/usage/multi-page)
 - [Usage: Auto-pagination]({{ site.baseurl }}/usage/auto-pagination)
-- [Guide: Server-side & Ktor]({{ site.baseurl }}/guides/server-side)
+- [Guide: Server-side & Ktor]({{ site.baseurl }}/guides/server-side) (JVM)
