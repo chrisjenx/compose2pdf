@@ -18,28 +18,17 @@ import org.jetbrains.skia.Rect
 import org.jetbrains.skia.svg.SVGCanvas
 
 /**
- * Shared utility for rendering Compose content to SVG via Skia's SVGCanvas.
- * Lives in skikoMain — shared between JVM and iOS (both use Skiko).
- * Not available on Android (which uses PdfDocument Canvas directly).
+ * Renders Compose content to SVG via Skia's SVGCanvas on iOS.
+ * Same logic as the JVM version but uses OutputWStream.toData() instead of ByteArrayOutputStream.
  */
 internal object ComposeToSvg {
 
-    /**
-     * Renders composable content to an SVG string.
-     *
-     * @param widthPx Width in pixels.
-     * @param heightPx Height in pixels.
-     * @param density Render density.
-     * @param content The composable content to render.
-     * @return SVG string.
-     */
     fun render(
         widthPx: Int,
         heightPx: Int,
         density: Density,
         content: @Composable () -> Unit,
     ): String {
-        // Step 1: Record Compose draw commands via PictureRecorder
         val recorder = PictureRecorder()
         val recordCanvas = recorder.beginRecording(
             Rect.makeWH(widthPx.toFloat(), heightPx.toFloat())
@@ -57,34 +46,28 @@ internal object ComposeToSvg {
 
         val picture = recorder.finishRecordingAsPicture()
 
-        // Step 2: Replay onto SVGCanvas to get vector SVG
-        val svgBytes = renderPictureToSvgBytes(picture, widthPx.toFloat(), heightPx.toFloat())
+        val wstream = OutputWStream()
+        val svgCanvas = SVGCanvas.make(
+            Rect.makeWH(widthPx.toFloat(), heightPx.toFloat()),
+            wstream,
+            convertTextToPaths = false,
+            prettyXML = false,
+        )
+
+        picture.playback(svgCanvas)
+        svgCanvas.close()
+        val data = wstream.toData()
+        wstream.close()
         picture.close()
 
-        return svgBytes.decodeToString()
+        return data.bytes.decodeToString()
     }
 
-    /**
-     * Result of rendering with measurement — contains both the SVG and the measured content height.
-     */
     data class RenderResult(
         val svg: String,
         val measuredHeightPx: Int,
     )
 
-    /**
-     * Renders composable content to SVG and measures its natural height.
-     *
-     * The content is wrapped in a Box with [onGloballyPositioned] to capture the
-     * actual measured height. The scene is created at [maxHeightPx] to allow content
-     * to expand vertically.
-     *
-     * @param widthPx Width in pixels.
-     * @param maxHeightPx Maximum height in pixels (scene height).
-     * @param density Render density.
-     * @param content The composable content to render.
-     * @return SVG string and measured content height in pixels.
-     */
     fun renderWithMeasurement(
         widthPx: Int,
         maxHeightPx: Int,
@@ -102,18 +85,6 @@ internal object ComposeToSvg {
         return RenderResult(svg, measuredHeight)
     }
 
-    /**
-     * Measures the natural height of composable content without producing SVG output.
-     *
-     * Uses a PictureRecorder to drive composition and layout without allocating a bitmap
-     * or generating SVG. Lightweight — suitable for measurement-only passes.
-     *
-     * @param widthPx Width in pixels.
-     * @param maxHeightPx Maximum height in pixels (scene height).
-     * @param density Render density.
-     * @param content The composable content to measure.
-     * @return Measured content height in pixels.
-     */
     fun measureContentHeight(
         widthPx: Int,
         maxHeightPx: Int,
@@ -144,13 +115,3 @@ internal object ComposeToSvg {
         return measuredHeight
     }
 }
-
-/**
- * Platform-specific: renders a Skia Picture to SVG bytes via OutputWStream.
- * JVM uses ByteArrayOutputStream, iOS uses platform-appropriate byte collection.
- */
-internal expect fun renderPictureToSvgBytes(
-    picture: org.jetbrains.skia.Picture,
-    width: Float,
-    height: Float,
-): ByteArray

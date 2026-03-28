@@ -35,21 +35,9 @@ kotlin {
             implementation(compose.ui)
         }
 
-        // Intermediate source set for JVM + iOS (platforms that use Skiko).
-        // Contains ComposeToSvg — the Compose→SVG rendering step shared by both.
-        // Android does NOT use this (it renders via PdfDocument Canvas directly).
-        val skikoMain by creating {
-            dependsOn(commonMain.get())
-            dependencies {
-                implementation(compose.desktop.common)
-            }
-        }
-
-        jvmMain {
-            dependsOn(skikoMain)
-            dependencies {
-                implementation(libs.pdfbox)
-            }
+        jvmMain.dependencies {
+            implementation(compose.desktop.common)
+            implementation(libs.pdfbox)
         }
 
         jvmTest.dependencies {
@@ -75,8 +63,15 @@ kotlin {
             }
         }
 
-        iosMain {
-            dependsOn(skikoMain)
+        iosMain.dependencies {
+        }
+
+        val iosSimulatorArm64Test by getting {
+            dependencies {
+                implementation(project(":test-fixtures"))
+                implementation(libs.kotlin.test)
+                implementation(compose.material3)
+            }
         }
     }
 

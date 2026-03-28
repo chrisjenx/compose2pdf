@@ -287,7 +287,7 @@ fun ComplexPathFixture() {
             val innerR = 35f
             for (i in 0 until 10) {
                 val r = if (i % 2 == 0) outerR else innerR
-                val angle = Math.PI / 2 + i * Math.PI / 5
+                val angle = kotlin.math.PI / 2 + i * kotlin.math.PI / 5
                 val x = cx + (r * cos(angle)).toFloat()
                 val y = cy - (r * sin(angle)).toFloat()
                 if (i == 0) moveTo(x, y) else lineTo(x, y)
