@@ -25,6 +25,8 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java-version }}
 
+      - uses: android-actions/setup-android@v3
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build library
@@ -32,6 +34,10 @@ jobs:
 
       - name: Unit tests
         run: ./gradlew :compose2pdf:test
+
+      - name: iOS simulator tests (macOS)
+        if: runner.os == 'macOS' && matrix.java-version == 17
+        run: ./gradlew :compose2pdf:iosSimulatorArm64Test
 
       - name: Fidelity tests (Linux)
         if: runner.os == 'Linux' && matrix.java-version == 17
@@ -50,5 +56,5 @@ jobs:
           if-no-files-found: ignore
 
       - name: Smoke test publishToMavenLocal
-        if: matrix.os == 'ubuntu-latest' && matrix.java-version == 17
+        if: matrix.os == 'macos-latest' && matrix.java-version == 17
         run: ./gradlew :compose2pdf:publishToMavenLocal
