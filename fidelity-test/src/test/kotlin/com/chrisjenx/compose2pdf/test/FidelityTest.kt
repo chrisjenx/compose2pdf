@@ -26,6 +26,8 @@ class FidelityTest {
 
     // Android PDFs from GMD test output (run :compose2pdf:pixel2api30atdDebugAndroidTest first)
     private val androidPdfDir = findAndroidPdfDir()
+    // iOS PDFs from simulator test output (run :compose2pdf:iosSimulatorArm64Test first)
+    private val iosPdfDir = findIosPdfDir()
 
     @Test
     fun `fidelity comparison of all fixtures`() {
@@ -146,9 +148,30 @@ class FidelityTest {
                 val aMaxError = ImageMetrics.computeMaxPixelError(composeImage, androidImage)
                 val aDiff = ImageMetrics.generateStructuralDiffImage(composeImage, androidImage)
                 saveImage(aDiff, imagesDir, "${fixture.name}-android-diff.png")
-                AndroidMetrics(aRmse, aSsim, aExactMatch, aMaxError)
+                PlatformMetrics(aRmse, aSsim, aExactMatch, aMaxError)
             } catch (e: Exception) {
                 println("  Warning: failed to process Android PDF for ${fixture.name}: ${e.message}")
+                null
+            }
+        } else null
+
+        // 8. iOS cross-platform comparison (optional — requires prior simulator test run)
+        val iosPdf = iosPdfDir?.let { File(it, "${fixture.name}-ios.pdf") }
+        val iosResult = if (iosPdf != null && iosPdf.exists()) {
+            try {
+                val iosPdfBytes = iosPdf.readBytes()
+                iosPdf.copyTo(File(imagesDir, "${fixture.name}-ios.pdf"), overwrite = true)
+                val iosImage = rasterizePdf(iosPdfBytes, renderDpi)
+                saveImage(iosImage, imagesDir, "${fixture.name}-ios.png")
+                val iRmse = ImageMetrics.computeRmse(composeImage, iosImage)
+                val iSsim = ImageMetrics.computeSsim(composeImage, iosImage)
+                val iExactMatch = ImageMetrics.computeExactMatchPercent(composeImage, iosImage)
+                val iMaxError = ImageMetrics.computeMaxPixelError(composeImage, iosImage)
+                val iDiff = ImageMetrics.generateStructuralDiffImage(composeImage, iosImage)
+                saveImage(iDiff, imagesDir, "${fixture.name}-ios-diff.png")
+                PlatformMetrics(iRmse, iSsim, iExactMatch, iMaxError)
+            } catch (e: Exception) {
+                println("  Warning: failed to process iOS PDF for ${fixture.name}: ${e.message}")
                 null
             }
         } else null
@@ -182,10 +205,18 @@ class FidelityTest {
             androidExactMatch = androidResult?.exactMatch ?: -1.0,
             androidMaxError = androidResult?.maxError ?: -1.0,
             androidStatus = if (androidResult != null) vectorStatus(androidResult.rmse, fixture.vectorThreshold) else Status.SKIPPED,
+            iosPath = if (iosResult != null) "images/${fixture.name}-ios.png" else "",
+            iosDiffPath = if (iosResult != null) "images/${fixture.name}-ios-diff.png" else "",
+            iosPdfPath = if (iosResult != null) "images/${fixture.name}-ios.pdf" else "",
+            iosRmse = iosResult?.rmse ?: -1.0,
+            iosSsim = iosResult?.ssim ?: -1.0,
+            iosExactMatch = iosResult?.exactMatch ?: -1.0,
+            iosMaxError = iosResult?.maxError ?: -1.0,
+            iosStatus = if (iosResult != null) vectorStatus(iosResult.rmse, fixture.vectorThreshold) else Status.SKIPPED,
         )
     }
 
-    private data class AndroidMetrics(
+    private data class PlatformMetrics(
         val rmse: Double,
         val ssim: Double,
         val exactMatch: Double,
@@ -217,6 +248,21 @@ class FidelityTest {
                 }
             }
             println("No Android PDFs found — run :compose2pdf:pixel2api30atdDebugAndroidTest first for cross-platform comparison")
+            return null
+        }
+
+        /** Searches for iOS PDF output from simulator tests. */
+        private fun findIosPdfDir(): File? {
+            val candidates = listOf(
+                File("/tmp/compose2pdf-ios-test-output"),
+            )
+            for (candidate in candidates) {
+                if (candidate.isDirectory && candidate.listFiles()?.any { it.name.endsWith("-ios.pdf") } == true) {
+                    println("Found iOS PDFs at: ${candidate.absolutePath}")
+                    return candidate
+                }
+            }
+            println("No iOS PDFs found — run :compose2pdf:iosSimulatorArm64Test first for cross-platform comparison")
             return null
         }
     }

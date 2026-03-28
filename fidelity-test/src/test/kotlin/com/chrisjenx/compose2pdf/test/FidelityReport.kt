@@ -38,8 +38,18 @@ data class FidelityResult(
     val androidExactMatch: Double = -1.0,
     val androidMaxError: Double = -1.0,
     val androidStatus: Status = Status.SKIPPED,
+    // iOS cross-platform comparison (optional)
+    val iosPath: String = "",
+    val iosDiffPath: String = "",
+    val iosPdfPath: String = "",
+    val iosRmse: Double = -1.0,
+    val iosSsim: Double = -1.0,
+    val iosExactMatch: Double = -1.0,
+    val iosMaxError: Double = -1.0,
+    val iosStatus: Status = Status.SKIPPED,
 ) {
     val hasAndroid: Boolean get() = androidStatus != Status.SKIPPED
+    val hasIos: Boolean get() = iosStatus != Status.SKIPPED
 
     val rowStatus: Status
         get() {
@@ -371,6 +381,30 @@ h1 { margin: 0 0 4px 0; font-size: 24px; }
                 appendLine("<div class='metric-row'><span class='metric-label'>Match</span><span class='metric-value'>${"%.2f".format(result.androidExactMatch * 100)}%</span></div>")
                 appendLine("<div class='metric-row'><span class='metric-label'>MaxErr</span><span class='metric-value'>${"%.4f".format(result.androidMaxError)}</span></div>")
                 appendLine("<div class='metric-row'><span class='metric-label'>Status</span><span class='metric-value $aStatusClass'>${result.androidStatus.label}</span></div>")
+                appendLine("</div>")
+                appendLine("</div></div>")
+            }
+
+            // iOS section (if available)
+            if (result.hasIos) {
+                val iStatusClass = "${result.iosStatus.cssClass}-text"
+                appendLine("<div class='mode-section'>")
+                appendLine("<div class='mode-label'>iOS</div>")
+                appendLine("<div class='mode-content'>")
+                appendLine("<div class='mode-images'>")
+                appendLine("<div class='img-group'><div class='img-label'>Rendered</div><img class='thumb' src='${escapeHtml(result.iosPath)}' onclick='openModal(this.src)'>")
+                if (result.iosPdfPath.isNotEmpty()) {
+                    appendLine("<a href='${escapeHtml(result.iosPdfPath)}' class='pdf-link' target='_blank'>Open PDF</a>")
+                }
+                appendLine("</div>")
+                appendLine("<div class='img-group'><div class='img-label'>Diff</div><img class='thumb' src='${escapeHtml(result.iosDiffPath)}' onclick='openModal(this.src)'></div>")
+                appendLine("</div>")
+                appendLine("<div class='mode-metrics'>")
+                appendLine("<div class='metric-row'><span class='metric-label'>RMSE</span><span class='metric-value'>${"%.4f".format(result.iosRmse)}</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>SSIM</span><span class='metric-value'>${"%.4f".format(result.iosSsim)}</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>Match</span><span class='metric-value'>${"%.2f".format(result.iosExactMatch * 100)}%</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>MaxErr</span><span class='metric-value'>${"%.4f".format(result.iosMaxError)}</span></div>")
+                appendLine("<div class='metric-row'><span class='metric-label'>Status</span><span class='metric-value $iStatusClass'>${result.iosStatus.label}</span></div>")
                 appendLine("</div>")
                 appendLine("</div></div>")
             }
