@@ -12,14 +12,14 @@ import androidx.compose.ui.scene.CanvasLayersComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
-import org.jetbrains.skia.OutputWStream
+import org.jetbrains.skia.DynamicMemoryWStream
 import org.jetbrains.skia.PictureRecorder
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.svg.SVGCanvas
 
 /**
  * Renders Compose content to SVG via Skia's SVGCanvas on iOS.
- * Same logic as the JVM version but uses OutputWStream.toData() instead of ByteArrayOutputStream.
+ * Same logic as the JVM version but uses DynamicMemoryWStream instead of ByteArrayOutputStream.
  */
 internal object ComposeToSvg {
 
@@ -46,7 +46,7 @@ internal object ComposeToSvg {
 
         val picture = recorder.finishRecordingAsPicture()
 
-        val wstream = OutputWStream()
+        val wstream = DynamicMemoryWStream()
         val svgCanvas = SVGCanvas.make(
             Rect.makeWH(widthPx.toFloat(), heightPx.toFloat()),
             wstream,
@@ -56,11 +56,13 @@ internal object ComposeToSvg {
 
         picture.playback(svgCanvas)
         svgCanvas.close()
-        val data = wstream.toData()
+        val size = wstream.bytesWritten()
+        val buffer = ByteArray(size)
+        wstream.read(buffer, 0, size)
         wstream.close()
         picture.close()
 
-        return data.bytes.decodeToString()
+        return buffer.decodeToString()
     }
 
     data class RenderResult(

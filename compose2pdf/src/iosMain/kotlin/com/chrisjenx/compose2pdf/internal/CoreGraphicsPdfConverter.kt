@@ -5,13 +5,11 @@ package com.chrisjenx.compose2pdf.internal
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.set
-import kotlinx.cinterop.useContents
 import platform.CoreFoundation.CFAttributedStringCreate
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDictionaryCreateMutable
@@ -60,17 +58,9 @@ import platform.CoreGraphics.CGPDFContextCreate
 import platform.CoreGraphics.CGPDFContextEndPage
 import platform.CoreGraphics.CGRect
 import platform.CoreGraphics.CGRectMake
-import platform.CoreGraphics.kCGLineCapButt
-import platform.CoreGraphics.kCGLineCapRound
-import platform.CoreGraphics.kCGLineCapSquare
-import platform.CoreGraphics.kCGLineJoinBevel
-import platform.CoreGraphics.kCGLineJoinMiter
-import platform.CoreGraphics.kCGLineJoinRound
-import platform.CoreGraphics.kCGPathEOFill
-import platform.CoreGraphics.kCGPathEOFillStroke
-import platform.CoreGraphics.kCGPathFill
-import platform.CoreGraphics.kCGPathFillStroke
-import platform.CoreGraphics.kCGPathStroke
+import platform.CoreGraphics.CGLineCap
+import platform.CoreGraphics.CGLineJoin
+import platform.CoreGraphics.CGPathDrawingMode
 import platform.CoreText.CTFontCreateWithName
 import platform.CoreText.CTLineCreateWithAttributedString
 import platform.CoreText.CTLineDraw
@@ -172,13 +162,7 @@ internal object CoreGraphicsPdfConverter {
         val cfData = CFBridgingRetain(mutableData) as CFMutableDataRef
         val consumer = CGDataConsumerCreateWithCFData(cfData)
 
-        val rect = alloc<CGRect>()
-        rect.useContents {
-            origin.x = 0.0
-            origin.y = 0.0
-            size.width = pageWidthPt.toDouble()
-            size.height = pageHeightPt.toDouble()
-        }
+        val rect = CGRectMake(0.0, 0.0, pageWidthPt.toDouble(), pageHeightPt.toDouble())
 
         val pdfContext = CGPDFContextCreate(consumer, rect.ptr, null)
             ?: run {
@@ -202,17 +186,8 @@ internal object CoreGraphicsPdfConverter {
     }
 
     private fun beginPage(ctx: CGContextRef, widthPt: Float, heightPt: Float) {
-        memScoped {
-            val mediaBox = alloc<CGRect>()
-            mediaBox.useContents {
-                origin.x = 0.0
-                origin.y = 0.0
-                size.width = widthPt.toDouble()
-                size.height = heightPt.toDouble()
-            }
-            // CGPDFContextBeginPage with null page dict uses the context's default media box
-            CGPDFContextBeginPage(ctx, null)
-        }
+        // CGPDFContextBeginPage with null page dict uses the context's default media box
+        CGPDFContextBeginPage(ctx, null)
     }
 
     private fun endPage(ctx: CGContextRef) {
@@ -464,7 +439,7 @@ internal object CoreGraphicsPdfConverter {
                     CGContextSetRGBStrokeColor(ctx, c.r.toDouble(), c.g.toDouble(), c.b.toDouble(), 1.0)
                 }
             }
-            CGContextDrawPath(ctx, kCGPathStroke)
+            CGContextDrawPath(ctx, CGPathDrawingMode.kCGPathStroke)
             CGContextRestoreGState(ctx)
         }
 
@@ -519,7 +494,10 @@ internal object CoreGraphicsPdfConverter {
             val ctFontName = resolveFontName(fontFamily, fontWeight, fontStyle)
 
             @Suppress("UNCHECKED_CAST")
-            val ctFont = CTFontCreateWithName(ctFontName as CFStringRef, fontSize, null)
+            val ctFontNameRef = platform.Foundation.CFBridgingRetain(ctFontName as platform.Foundation.NSString) as CFStringRef
+            val ctFont = CTFontCreateWithName(ctFontNameRef, fontSize, null)
+            CFRelease(ctFontNameRef)
+            if (ctFont == null) return restore()
 
             val xAttr = elem.attr("x") ?: ""
             val xPositions = xAttr.split(",").mapNotNull { it.trim().toDoubleOrNull() }
@@ -578,11 +556,13 @@ internal object CoreGraphicsPdfConverter {
             }
 
             @Suppress("UNCHECKED_CAST")
+            val textRef = platform.Foundation.CFBridgingRetain(text as platform.Foundation.NSString) as CFStringRef
             val attrString = CFAttributedStringCreate(
                 kCFAllocatorDefault,
-                CFBridgingRetain(text) as CFStringRef,
+                textRef,
                 attrDict,
             )
+            CFRelease(textRef)
 
             val line = CTLineCreateWithAttributedString(attrString)
 
@@ -747,11 +727,11 @@ internal object CoreGraphicsPdfConverter {
             val evenOdd = elem.attr("fill-rule") == "evenodd"
             when {
                 hasFill && hasStroke -> {
-                    CGContextDrawPath(ctx, if (evenOdd) kCGPathEOFillStroke else kCGPathFillStroke)
+                    CGContextDrawPath(ctx, if (evenOdd) CGPathDrawingMode.kCGPathEOFillStroke else CGPathDrawingMode.kCGPathFillStroke)
                 }
-                hasStroke -> CGContextDrawPath(ctx, kCGPathStroke)
+                hasStroke -> CGContextDrawPath(ctx, CGPathDrawingMode.kCGPathStroke)
                 hasFill -> {
-                    CGContextDrawPath(ctx, if (evenOdd) kCGPathEOFill else kCGPathFill)
+                    CGContextDrawPath(ctx, if (evenOdd) CGPathDrawingMode.kCGPathEOFill else CGPathDrawingMode.kCGPathFill)
                 }
             }
         }
@@ -765,9 +745,9 @@ internal object CoreGraphicsPdfConverter {
                 CGContextSetLineCap(
                     ctx,
                     when (cap) {
-                        "round" -> kCGLineCapRound
-                        "square" -> kCGLineCapSquare
-                        else -> kCGLineCapButt
+                        "round" -> CGLineCap.kCGLineCapRound
+                        "square" -> CGLineCap.kCGLineCapSquare
+                        else -> CGLineCap.kCGLineCapButt
                     }
                 )
             }
@@ -776,9 +756,9 @@ internal object CoreGraphicsPdfConverter {
                 CGContextSetLineJoin(
                     ctx,
                     when (join) {
-                        "round" -> kCGLineJoinRound
-                        "bevel" -> kCGLineJoinBevel
-                        else -> kCGLineJoinMiter
+                        "round" -> CGLineJoin.kCGLineJoinRound
+                        "bevel" -> CGLineJoin.kCGLineJoinBevel
+                        else -> CGLineJoin.kCGLineJoinMiter
                     }
                 )
             }
