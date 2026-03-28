@@ -2,6 +2,7 @@
 
 package com.chrisjenx.compose2pdf
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.ui.unit.sp
 import com.chrisjenx.compose2pdf.fixtures.sharedFixtures
@@ -35,6 +36,22 @@ class IosPdfRenderTest {
             Text("Hello from iOS!", fontSize = 24.sp)
         }
         assertValidPdf(bytes, "basicRender")
+    }
+
+    @Test
+    fun textWithLetterSpacing_producesValidPdf() {
+        // Regression test: letter-spacing causes Skia to emit per-glyph x-positions
+        // in SVG <text> elements. The renderer must handle these without introducing
+        // visible spacing artifacts (previously each glyph was drawn as a separate CTLine).
+        val bytes = renderToPdf {
+            Column {
+                Text("Normal spacing", fontSize = 16.sp)
+                Text("Wide spacing", fontSize = 16.sp, letterSpacing = 4.sp)
+                Text("Tight spacing", fontSize = 16.sp, letterSpacing = (-0.5).sp)
+            }
+        }
+        assertValidPdf(bytes, "textWithLetterSpacing")
+        savePdf("text-letter-spacing-ios.pdf", bytes)
     }
 
     @Test

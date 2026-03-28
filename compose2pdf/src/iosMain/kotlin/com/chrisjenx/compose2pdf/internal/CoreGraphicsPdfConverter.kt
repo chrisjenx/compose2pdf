@@ -9,6 +9,7 @@ import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.UShortVar
 import kotlinx.cinterop.set
 import platform.CoreFoundation.CFAttributedStringCreate
 import platform.CoreFoundation.CFDataGetBytePtr
@@ -61,7 +62,10 @@ import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGLineCap
 import platform.CoreGraphics.CGLineJoin
 import platform.CoreGraphics.CGPathDrawingMode
+import platform.CoreGraphics.CGPoint
 import platform.CoreText.CTFontCreateWithName
+import platform.CoreText.CTFontDrawGlyphs
+import platform.CoreText.CTFontGetGlyphsForCharacters
 import platform.CoreText.CTLineCreateWithAttributedString
 import platform.CoreText.CTLineDraw
 import platform.CoreText.kCTFontAttributeName
@@ -508,30 +512,39 @@ internal object CoreGraphicsPdfConverter {
             // Matrix: (1, 0, 0, -1, 0, 2*yOffset)
             CGContextConcatCTM(ctx, CGAffineTransformMake(1.0, 0.0, 0.0, -1.0, 0.0, 2.0 * yOffset))
 
-            // Create color for text
-            val colorSpace = CGColorSpaceCreateDeviceRGB()
-            val cgColor = memScoped {
-                val components = allocArray<kotlinx.cinterop.DoubleVar>(4)
-                components[0] = fillColor.r.toDouble()
-                components[1] = fillColor.g.toDouble()
-                components[2] = fillColor.b.toDouble()
-                components[3] = 1.0
-                CGColorCreate(colorSpace, components)
-            }
-
             if (xPositions.size > 1 && xPositions.size >= text.length) {
-                // Position each glyph individually for precise placement
-                for (i in text.indices) {
-                    val glyphX = xPositions[i]
-                    drawTextAtPosition(ctFont, text[i].toString(), glyphX, yOffset, cgColor)
+                // CTFontDrawGlyphs bypasses CTLine's text layout engine, placing each
+                // glyph exactly at the specified coordinate without bearing adjustments.
+                memScoped {
+                    val count = text.length
+                    val characters = allocArray<UShortVar>(count)
+                    val positions = allocArray<CGPoint>(count)
+                    for (i in 0 until count) {
+                        characters[i] = text[i].code.toUShort()
+                        positions[i].x = xPositions[i]
+                        positions[i].y = yOffset
+                    }
+                    val glyphs = allocArray<UShortVar>(count)
+                    CTFontGetGlyphsForCharacters(ctFont, characters, glyphs, count.toLong())
+                    CGContextSetRGBFillColor(ctx, fillColor.r.toDouble(), fillColor.g.toDouble(), fillColor.b.toDouble(), 1.0)
+                    CTFontDrawGlyphs(ctFont, glyphs, positions, count.toULong(), ctx)
                 }
             } else {
+                val colorSpace = CGColorSpaceCreateDeviceRGB()
+                val cgColor = memScoped {
+                    val components = allocArray<kotlinx.cinterop.DoubleVar>(4)
+                    components[0] = fillColor.r.toDouble()
+                    components[1] = fillColor.g.toDouble()
+                    components[2] = fillColor.b.toDouble()
+                    components[3] = 1.0
+                    CGColorCreate(colorSpace, components)
+                }
                 val x0 = xPositions.firstOrNull() ?: 0.0
                 drawTextAtPosition(ctFont, text, x0, yOffset, cgColor)
+                CGColorRelease(cgColor)
+                CGColorSpaceRelease(colorSpace)
             }
 
-            CGColorRelease(cgColor)
-            CGColorSpaceRelease(colorSpace)
             CFRelease(ctFont)
             CGContextRestoreGState(ctx)
         }
