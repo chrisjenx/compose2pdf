@@ -16,11 +16,11 @@ import org.jetbrains.skia.OutputWStream
 import org.jetbrains.skia.PictureRecorder
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.svg.SVGCanvas
-import java.io.ByteArrayOutputStream
 
 /**
  * Shared utility for rendering Compose content to SVG via Skia's SVGCanvas.
- * Used by both PdfRenderer (SVG → PDF) and HtmlRenderer (SVG → HTML).
+ * Lives in skikoMain — shared between JVM and iOS (both use Skiko).
+ * Not available on Android (which uses PdfDocument Canvas directly).
  */
 internal object ComposeToSvg {
 
@@ -58,20 +58,10 @@ internal object ComposeToSvg {
         val picture = recorder.finishRecordingAsPicture()
 
         // Step 2: Replay onto SVGCanvas to get vector SVG
-        val baos = ByteArrayOutputStream()
-        val wstream = OutputWStream(baos)
-        val svgCanvas = SVGCanvas.make(
-            Rect.makeWH(widthPx.toFloat(), heightPx.toFloat()),
-            wstream,
-            convertTextToPaths = false,
-            prettyXML = false,
-        )
+        val svgBytes = renderPictureToSvgBytes(picture, widthPx.toFloat(), heightPx.toFloat())
+        picture.close()
 
-        picture.playback(svgCanvas)
-        svgCanvas.close()
-        wstream.close()
-
-        return baos.toString(Charsets.UTF_8)
+        return svgBytes.decodeToString()
     }
 
     /**
@@ -154,3 +144,13 @@ internal object ComposeToSvg {
         return measuredHeight
     }
 }
+
+/**
+ * Platform-specific: renders a Skia Picture to SVG bytes via OutputWStream.
+ * JVM uses ByteArrayOutputStream, iOS uses platform-appropriate byte collection.
+ */
+internal expect fun renderPictureToSvgBytes(
+    picture: org.jetbrains.skia.Picture,
+    width: Float,
+    height: Float,
+): ByteArray
