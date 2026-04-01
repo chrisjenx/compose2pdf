@@ -26,6 +26,8 @@ import com.chrisjenx.compose2pdf.*
 | [`PdfPageConfig`]({{ site.baseurl }}/api/pdf-page-config) | Page dimensions and margins (A4, Letter, A3, custom) |
 | [`PdfMargins`]({{ site.baseurl }}/api/pdf-margins) | Page margin presets and custom margins |
 | [`PdfLink`]({{ site.baseurl }}/api/pdf-link) | Clickable URL annotation composable |
+| [`PaginatedColumn`]({{ site.baseurl }}/api/paginated-column) | Column layout with page-break protection |
+| [`LocalPdfPageConfig`]({{ site.baseurl }}/api/local-pdf-page-config) | CompositionLocal for page dimensions inside `renderToPdf` |
 | [`RenderMode`]({{ site.baseurl }}/api/render-mode) | Vector or raster rendering mode |
 | [`PdfRoundedCornerShape`]({{ site.baseurl }}/api/pdf-rounded-corner-shape) | PDF-safe rounded corners for non-uniform radii |
 | [`Shape.asPdfSafe()`]({{ site.baseurl }}/api/pdf-rounded-corner-shape) | Wrap any shape for correct PDF rendering |

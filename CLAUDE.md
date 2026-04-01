@@ -55,11 +55,12 @@ renderToPdf(outputStream, config, density, mode, defaultFontFamily, pagination) 
 renderToPdf(pages, config, density, mode, defaultFontFamily) { pageIndex → content } → ByteArray  // manual pages
 renderToPdf(outputStream, pages, config, density, mode, defaultFontFamily) { pageIndex → content }  // streaming variant
 PdfLink(href) { content }
+PaginatedColumn(modifier) { content }  // page-break-aware Column, reads page config automatically
 PdfRoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)
 Shape.asPdfSafe()
 ```
 
-Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargins + `landscape()`), `PdfMargins` (None/Narrow/Normal + `symmetric()`), `PdfPagination` (AUTO/SINGLE_PAGE), `Density`, `RenderMode` (VECTOR/RASTER), `InterFontFamily`, `Compose2PdfException`.
+Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargins + `landscape()`), `PdfMargins` (None/Narrow/Normal + `symmetric()`), `PdfPagination` (AUTO/SINGLE_PAGE), `Density`, `RenderMode` (VECTOR/RASTER), `InterFontFamily`, `Compose2PdfException`, `LocalPdfPageConfig`.
 
 ## Key Files
 
@@ -119,7 +120,7 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 - Package: `com.chrisjenx.compose2pdf`
 - Internal implementation in `com.chrisjenx.compose2pdf.internal`
 - `internal` visibility by default for implementation classes
-- Public API: `renderToPdf()`, `PdfLink()`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
+- Public API: `renderToPdf()`, `PdfLink()`, `PaginatedColumn()`, `LocalPdfPageConfig`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
 - Tests use `kotlin-test`
 
 ## Publishing

@@ -34,6 +34,7 @@ fun main() {
         ::vectorVsRaster,
         ::professionalInvoice,
         ::autoPagination,
+        ::paginatedColumnExample,
     )
 
     val outputs = mutableListOf<ExampleOutput>()
