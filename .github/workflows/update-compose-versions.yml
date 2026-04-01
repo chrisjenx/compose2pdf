@@ -13,7 +13,16 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Detect latest Compose Multiplatform versions
         id: detect
@@ -105,6 +114,7 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
+          token: ${{ steps.app-token.outputs.token }}
           title: "Update Compose Multiplatform compatibility matrix"
           body: |
             Auto-detected new Compose Multiplatform versions from Maven Central.
