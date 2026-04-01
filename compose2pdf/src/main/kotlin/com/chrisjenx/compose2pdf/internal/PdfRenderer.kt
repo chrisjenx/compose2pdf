@@ -217,7 +217,7 @@ internal object PdfRenderer {
         for (pageIndex in 0 until pageCount) {
             val linkCollector = PdfLinkCollector()
             val svg = ComposeToSvg.render(pxW, pxH, density) {
-                WrapContent(defaultFontFamily, linkCollector) {
+                WrapContent(defaultFontFamily, linkCollector, config) {
                     content(pageIndex)
                 }
             }
@@ -245,7 +245,7 @@ internal object PdfRenderer {
                 height = contentHeightPx,
                 density = density,
                 content = {
-                    WrapContent(defaultFontFamily, linkCollector) {
+                    WrapContent(defaultFontFamily, linkCollector, config) {
                         content(pageIndex)
                     }
                 },
