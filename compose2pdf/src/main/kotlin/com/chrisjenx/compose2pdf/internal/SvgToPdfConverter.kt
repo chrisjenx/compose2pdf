@@ -300,8 +300,8 @@ internal object SvgToPdfConverter {
             applyTransform(elem); applyOpacity(elem)
 
             val fontSize = attr(elem, "font-size")?.toFloatOrNull() ?: 12f
-            val text = elem.textContent.trim()
-            if (text.isEmpty()) return restore()
+            val rawText = elem.textContent.trim()
+            if (rawText.isEmpty()) return restore()
 
             val fillColor = attr(elem, "fill")
                 ?.takeIf { it != "none" }
@@ -317,9 +317,12 @@ internal object SvgToPdfConverter {
             )
 
             val xAttr = attr(elem, "x") ?: ""
-            val xPositions = xAttr.split(",").mapNotNull { it.trim().toFloatOrNull() }
+            val rawXPositions = xAttr.split(",").mapNotNull { it.trim().toFloatOrNull() }
             val yOffset = (attr(elem, "y") ?: "").split(",")
                 .firstOrNull()?.trim()?.toFloatOrNull() ?: fontSize
+
+            // Decompose Unicode ligatures that PDFBox fonts may lack cmap entries for
+            val (text, xPositions) = TextNormalizer.normalize(rawText, rawXPositions, fontSize)
 
             // Counter-flip Y for text (undo global Y-flip so glyphs render right-side up)
             cs.transform(CoordinateTransform.textCounterFlipMatrix(yOffset))

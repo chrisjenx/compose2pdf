@@ -410,6 +410,32 @@ class SvgConverterTest {
         }
     }
 
+    // --- Unicode ligature handling ---
+
+    @Test
+    fun `text with Unicode ligature ff renders without error`() {
+        // U+FB00 = LATIN SMALL LIGATURE FF
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50">
+            <text x="10,20,30,40,50" y="40" font-size="12" font-family="Inter">e&#xFB00;ect</text>
+        </svg>"""
+        PDDocument().use { doc ->
+            SvgToPdfConverter.addPage(doc, svg, 200f, 50f)
+            assertEquals(1, doc.numberOfPages)
+        }
+    }
+
+    @Test
+    fun `text with ligature in bulk mode renders without error`() {
+        // Single x-position (bulk showText path)
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="300" height="50">
+            <text x="10" y="40" font-size="14" font-family="Inter">o&#xFB03;ce &#xFB02;oor</text>
+        </svg>"""
+        PDDocument().use { doc ->
+            SvgToPdfConverter.addPage(doc, svg, 300f, 50f)
+            assertEquals(1, doc.numberOfPages)
+        }
+    }
+
     @Test
     fun `multiple pages with same SVG produce valid PDF`() {
         val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
