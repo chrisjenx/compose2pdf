@@ -130,4 +130,59 @@ class MultipageTest {
             }
         }
     }
+
+    @Test
+    fun `multipage PDF renders all pages with margins`() {
+        imagesDir.mkdirs()
+        val marginConfig = PdfPageConfig.A4WithMargins
+        val pageCount = 2
+        val pageContents: List<@Composable () -> Unit> = listOf(
+            {
+                Column(Modifier.fillMaxSize().background(Color(0xFFFFF3E0)).padding(24.dp)) {
+                    Text("Page 1", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    Text("With Normal margins (72dp). The orange background must occupy only the content area.", fontSize = 14.sp)
+                }
+            },
+            {
+                Column(Modifier.fillMaxSize().background(Color(0xFFE8F5E9)).padding(24.dp)) {
+                    Text("Page 2", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    Text("Same margins on every page.", fontSize = 14.sp)
+                }
+            },
+        )
+
+        for (mode in listOf(RenderMode.VECTOR, RenderMode.RASTER)) {
+            val modeName = mode.name.lowercase()
+            val pdfBytes = renderToPdf(pages = pageCount, config = marginConfig, density = density, mode = mode) { i ->
+                pageContents[i]()
+            }
+            File(imagesDir, "multipage-margins-$modeName.pdf").writeBytes(pdfBytes)
+            Loader.loadPDF(pdfBytes).use { doc ->
+                assertEquals(pageCount, doc.numberOfPages)
+                for (i in 0 until pageCount) {
+                    val pdfImage = rasterizePdf(doc, renderDpi, page = i)
+                    saveImage(pdfImage, imagesDir, "multipage-margins-$modeName-p${i}.png")
+
+                    // 144 DPI -> 2 px per point. Top margin (72pt) = 144 px.
+                    val pxPerPt = renderDpi / 72f
+                    val marginPxTop = (marginConfig.margins.top.value * pxPerPt).toInt()
+                    val marginPxLeft = (marginConfig.margins.left.value * pxPerPt).toInt()
+                    // A pixel halfway into the top-left margin should be white (page background).
+                    val rgbMargin = pdfImage.getRGB(marginPxLeft / 2, marginPxTop / 2) and 0xFFFFFF
+                    assertTrue(
+                        rgbMargin > 0xF0F0F0,
+                        "Expected white in top-left margin at p=$i mode=$modeName, got ${"%06X".format(rgbMargin)}",
+                    )
+                    // A pixel just inside the content area should be coloured.
+                    val rgbContent = pdfImage.getRGB(marginPxLeft + 4, marginPxTop + 4) and 0xFFFFFF
+                    assertTrue(
+                        rgbContent < 0xF0F0F0,
+                        "Expected non-white inside content area at p=$i mode=$modeName, got ${"%06X".format(rgbContent)}",
+                    )
+                }
+            }
+        }
+    }
 }
