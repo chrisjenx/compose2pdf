@@ -221,7 +221,14 @@ internal object PdfRenderer {
                     content(pageIndex)
                 }
             }
-            SvgToPdfConverter.addPage(pdfDoc, svg, config.width.value, config.height.value, fontCache, imageCache)
+            SvgToPdfConverter.addPage(
+                pdfDoc,
+                svg,
+                PageLayout.from(config),
+                density.density,
+                fontCache,
+                imageCache,
+            )
             addLinkAnnotations(pdfDoc.getPage(pageIndex), config, linkCollector.links)
         }
         return pdfDoc
