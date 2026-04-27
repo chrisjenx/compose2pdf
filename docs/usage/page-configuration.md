@@ -121,7 +121,10 @@ println(config.contentWidth)   // 451.dp  (595 - 72 - 72)
 println(config.contentHeight)  // 698.dp  (842 - 72 - 72)
 ```
 
-Your composable content is laid out within this content area.
+Your composable content is laid out within this content area. The margin region remains blank -- modifiers like `Modifier.fillMaxSize()` fill the content area, not the entire page.
+
+{: .note }
+Margins are applied at the PDF page level, not as Compose padding. This means modifiers like `border()` or `background()` on a `Modifier.fillMaxSize()` element produce a frame around the content area, not the page edge.
 
 ---
 
