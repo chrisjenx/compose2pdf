@@ -15,7 +15,7 @@ Complete code examples demonstrating compose2pdf features. All examples are runn
 | # | Example | Features demonstrated |
 |:--|:--------|:---------------------|
 | 01 | [Hello World]({{ site.baseurl }}/examples/hello-world) | Basic `renderToPdf`, text, layout |
-| 02 | Page Configuration | Page presets, margins, landscape, custom sizes |
+| 02 | [Page Configuration]({{ site.baseurl }}/examples/page-configuration) | Page presets, margins, landscape, custom sizes |
 | 03 | Text Styling | Font weights, styles, colors, decorations, alignment |
 | 04 | Layout Basics | Column, Row, Box, weights, arrangement, padding |
 | 05 | Shapes and Drawing | Backgrounds, borders, clips, Canvas, rounded corners |

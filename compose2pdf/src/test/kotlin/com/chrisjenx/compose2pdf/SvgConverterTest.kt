@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
+import com.chrisjenx.compose2pdf.internal.PageLayout
 import com.chrisjenx.compose2pdf.internal.SvgToPdfConverter
 import org.apache.pdfbox.pdmodel.PDDocument
 import java.io.File
@@ -338,7 +339,7 @@ class SvgConverterTest {
         </svg>"""
         val logs = collectLogs(converterLogger) {
             PDDocument().use { doc ->
-                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+                SvgToPdfConverter.addPage(doc, svg, PageLayout.full(100f, 100f), density = 1f)
             }
         }
         assertTrue(
@@ -354,7 +355,7 @@ class SvgConverterTest {
         </svg>"""
         val logs = collectLogs(converterLogger) {
             PDDocument().use { doc ->
-                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+                SvgToPdfConverter.addPage(doc, svg, PageLayout.full(100f, 100f), density = 1f)
             }
         }
         assertTrue(
@@ -370,7 +371,7 @@ class SvgConverterTest {
         </svg>"""
         val logs = collectLogs(converterLogger) {
             PDDocument().use { doc ->
-                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+                SvgToPdfConverter.addPage(doc, svg, PageLayout.full(100f, 100f), density = 1f)
             }
         }
         assertTrue(
@@ -386,7 +387,7 @@ class SvgConverterTest {
         </svg>"""
         val logs = collectLogs(converterLogger) {
             PDDocument().use { doc ->
-                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+                SvgToPdfConverter.addPage(doc, svg, PageLayout.full(100f, 100f), density = 1f)
             }
         }
         assertTrue(
@@ -405,7 +406,7 @@ class SvgConverterTest {
             <circle cx="50" cy="150" r="30" style="fill:yellow;stroke:black;stroke-width:1"/>
         </svg>"""
         PDDocument().use { doc ->
-            SvgToPdfConverter.addPage(doc, svg, 200f, 200f)
+            SvgToPdfConverter.addPage(doc, svg, PageLayout.full(200f, 200f), density = 1f)
             assertEquals(1, doc.numberOfPages)
         }
     }
@@ -419,7 +420,7 @@ class SvgConverterTest {
             <text x="10,20,30,40,50" y="40" font-size="12" font-family="Inter">e&#xFB00;ect</text>
         </svg>"""
         PDDocument().use { doc ->
-            SvgToPdfConverter.addPage(doc, svg, 200f, 50f)
+            SvgToPdfConverter.addPage(doc, svg, PageLayout.full(200f, 50f), density = 1f)
             assertEquals(1, doc.numberOfPages)
         }
     }
@@ -431,7 +432,7 @@ class SvgConverterTest {
             <text x="10" y="40" font-size="14" font-family="Inter">o&#xFB03;ce &#xFB02;oor</text>
         </svg>"""
         PDDocument().use { doc ->
-            SvgToPdfConverter.addPage(doc, svg, 300f, 50f)
+            SvgToPdfConverter.addPage(doc, svg, PageLayout.full(300f, 50f), density = 1f)
             assertEquals(1, doc.numberOfPages)
         }
     }
@@ -443,7 +444,7 @@ class SvgConverterTest {
         </svg>"""
         PDDocument().use { doc ->
             repeat(10) {
-                SvgToPdfConverter.addPage(doc, svg, 100f, 100f)
+                SvgToPdfConverter.addPage(doc, svg, PageLayout.full(100f, 100f), density = 1f)
             }
             assertEquals(10, doc.numberOfPages)
         }

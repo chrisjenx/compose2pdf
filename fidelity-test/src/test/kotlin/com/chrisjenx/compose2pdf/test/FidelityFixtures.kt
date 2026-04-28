@@ -103,6 +103,12 @@ val fidelityFixtures = listOf(
     // Page sizes
     Fixture("letter-page", "page-size", "US Letter size content", config = PdfPageConfig.Letter) { LetterPageFixture() },
     Fixture("a3-page", "page-size", "A3 size content", config = PdfPageConfig.A3) { A3PageFixture() },
+    Fixture(
+        "page-with-margins",
+        "page-size",
+        "A4 with Normal (72dp) margins -- content must render inside content area",
+        config = PdfPageConfig.A4WithMargins,
+    ) { PageWithMarginsFixture() },
 )
 
 // -- Basic --
@@ -1451,6 +1457,25 @@ private fun A3PageFixture() {
                     Text(cell, Modifier.weight(1f), fontSize = 11.sp)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PageWithMarginsFixture() {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE3F2FD))
+            .border(2.dp, Color(0xFF1565C0))
+            .padding(16.dp)
+    ) {
+        Column {
+            Text("Margin test", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("This box must render inside the 72dp page margins.", fontSize = 12.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("If margins are ignored, the blue border would touch the page edge.", fontSize = 12.sp)
         }
     }
 }

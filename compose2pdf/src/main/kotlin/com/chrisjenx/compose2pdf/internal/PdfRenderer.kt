@@ -214,6 +214,7 @@ internal object PdfRenderer {
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
         val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
+        val pageLayout = PageLayout.from(config)
         for (pageIndex in 0 until pageCount) {
             val linkCollector = PdfLinkCollector()
             val svg = ComposeToSvg.render(pxW, pxH, density) {
@@ -221,7 +222,7 @@ internal object PdfRenderer {
                     content(pageIndex)
                 }
             }
-            SvgToPdfConverter.addPage(pdfDoc, svg, config.width.value, config.height.value, fontCache, imageCache)
+            SvgToPdfConverter.addPage(pdfDoc, svg, pageLayout, density.density, fontCache, imageCache)
             addLinkAnnotations(pdfDoc.getPage(pageIndex), config, linkCollector.links)
         }
         return pdfDoc
