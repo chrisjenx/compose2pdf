@@ -86,6 +86,14 @@ internal fun saveImage(image: BufferedImage, imagesDir: File, filename: String) 
     ImageIO.write(image, "PNG", file)
 }
 
+internal fun BufferedImage.isWhitishAt(x: Int, y: Int, threshold: Int = 240): Boolean {
+    val rgb = getRGB(x, y)
+    val r = (rgb shr 16) and 0xFF
+    val g = (rgb shr 8) and 0xFF
+    val b = rgb and 0xFF
+    return r > threshold && g > threshold && b > threshold
+}
+
 internal fun renderComposeToSvg(
     widthPx: Int,
     heightPx: Int,

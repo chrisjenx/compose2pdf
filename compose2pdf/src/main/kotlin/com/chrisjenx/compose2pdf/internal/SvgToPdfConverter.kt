@@ -55,30 +55,6 @@ internal object SvgToPdfConverter {
     }
 
     /**
-     * Backwards-compatible no-margin overload. Used by unit tests that don't exercise
-     * the margin code path. Equivalent to a [PageLayout] where content area equals page
-     * dimensions and density is 1.
-     */
-    fun addPage(
-        pdfDoc: PDDocument,
-        svg: String,
-        pageWidthPt: Float,
-        pageHeightPt: Float,
-        fontCache: MutableMap<String, PDFont> = mutableMapOf(),
-        imageCache: MutableMap<String, PDImageXObject> = mutableMapOf(),
-    ) {
-        val layout = PageLayout(
-            pageWidthPt = pageWidthPt,
-            pageHeightPt = pageHeightPt,
-            contentWidthPt = pageWidthPt,
-            contentHeightPt = pageHeightPt,
-            marginLeftPt = 0f,
-            marginTopPt = 0f,
-        )
-        addPage(pdfDoc, svg, layout, density = 1f, fontCache, imageCache)
-    }
-
-    /**
      * Adds auto-paginated pages from a tall SVG, slicing vertically with proper
      * margins, clipping, and page offsets.
      *

@@ -23,5 +23,14 @@ internal data class PageLayout(
             marginLeftPt = config.margins.left.value,
             marginTopPt = config.margins.top.value,
         )
+
+        fun full(widthPt: Float, heightPt: Float) = PageLayout(
+            pageWidthPt = widthPt,
+            pageHeightPt = heightPt,
+            contentWidthPt = widthPt,
+            contentHeightPt = heightPt,
+            marginLeftPt = 0f,
+            marginTopPt = 0f,
+        )
     }
 }

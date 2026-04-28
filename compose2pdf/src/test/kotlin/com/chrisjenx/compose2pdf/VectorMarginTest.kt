@@ -32,22 +32,18 @@ class VectorMarginTest {
         }
 
         Loader.loadPDF(bytes).use { doc ->
-            val image = PDFRenderer(doc).renderImageWithDPI(0, 72f) // 1pt == 1px
+            // 72 DPI ⇒ 1 pt == 1 px, so coordinate assertions below use page units directly.
+            val image = PDFRenderer(doc).renderImageWithDPI(0, 72f)
             assertEquals(200, image.width)
             assertEquals(200, image.height)
 
-            // Top-left corner inside margin region (top=50, left=50) → must be white.
             assertWhite(image, 10, 10, "top-left margin")
             assertWhite(image, 49, 49, "just inside top-left margin boundary")
 
-            // Center of page is inside content area → must be red.
             assertRed(image, 100, 100, "content centre")
-
-            // Just inside content boundary on each side → must be red.
             assertRed(image, 51, 51, "top-left content corner")
             assertRed(image, 148, 148, "bottom-right content corner")
 
-            // Outer corners outside content → must be white.
             assertWhite(image, 10, 190, "bottom-left margin")
             assertWhite(image, 190, 10, "top-right margin")
             assertWhite(image, 190, 190, "bottom-right margin")
@@ -72,18 +68,14 @@ class VectorMarginTest {
 
         Loader.loadPDF(bytes).use { doc ->
             assertEquals(2, doc.numberOfPages)
+            val renderer = PDFRenderer(doc)
             for (pageIndex in 0 until 2) {
-                val image = PDFRenderer(doc).renderImageWithDPI(pageIndex, 72f)
-                // top margin: rows 0..29 white
+                val image = renderer.renderImageWithDPI(pageIndex, 72f)
                 assertWhite(image, 100, 5, "page=$pageIndex top margin")
                 assertWhite(image, 100, 29, "page=$pageIndex top margin edge")
-                // left margin: cols 0..19 white at content-y
                 assertWhite(image, 5, 100, "page=$pageIndex left margin")
-                // right margin: cols 160..199 white (200 - 40 = 160)
                 assertWhite(image, 165, 100, "page=$pageIndex right margin")
-                // bottom margin: rows 140..199 white (200 - 60 = 140)
                 assertWhite(image, 100, 145, "page=$pageIndex bottom margin")
-                // content area centre red
                 assertRed(image, 90, 80, "page=$pageIndex content centre")
             }
         }

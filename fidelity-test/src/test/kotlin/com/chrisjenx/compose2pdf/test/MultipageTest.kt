@@ -165,21 +165,16 @@ class MultipageTest {
                     val pdfImage = rasterizePdf(doc, renderDpi, page = i)
                     saveImage(pdfImage, imagesDir, "multipage-margins-$modeName-p${i}.png")
 
-                    // 144 DPI -> 2 px per point. Top margin (72pt) = 144 px.
                     val pxPerPt = renderDpi / 72f
                     val marginPxTop = (marginConfig.margins.top.value * pxPerPt).toInt()
                     val marginPxLeft = (marginConfig.margins.left.value * pxPerPt).toInt()
-                    // A pixel halfway into the top-left margin should be white (page background).
-                    val rgbMargin = pdfImage.getRGB(marginPxLeft / 2, marginPxTop / 2) and 0xFFFFFF
                     assertTrue(
-                        rgbMargin > 0xF0F0F0,
-                        "Expected white in top-left margin at p=$i mode=$modeName, got ${"%06X".format(rgbMargin)}",
+                        pdfImage.isWhitishAt(marginPxLeft / 2, marginPxTop / 2),
+                        "Expected white in top-left margin at p=$i mode=$modeName",
                     )
-                    // A pixel just inside the content area should be coloured.
-                    val rgbContent = pdfImage.getRGB(marginPxLeft + 4, marginPxTop + 4) and 0xFFFFFF
                     assertTrue(
-                        rgbContent < 0xF0F0F0,
-                        "Expected non-white inside content area at p=$i mode=$modeName, got ${"%06X".format(rgbContent)}",
+                        !pdfImage.isWhitishAt(marginPxLeft + 4, marginPxTop + 4),
+                        "Expected non-white inside content area at p=$i mode=$modeName",
                     )
                 }
             }
