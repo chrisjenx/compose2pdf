@@ -17,7 +17,7 @@ jobs:
     outputs:
       matrix: ${{ steps.load.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: load
         run: echo "matrix=$(jq -c '.versions' .github/compose-versions.json)" >> "$GITHUB_OUTPUT"
 
@@ -31,16 +31,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: CMP ${{ matrix.version.compose-version }} / ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           lfs: true
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Override versions
         run: |
