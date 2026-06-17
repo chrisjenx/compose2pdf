@@ -3,6 +3,7 @@ package com.chrisjenx.compose2pdf.test
 import androidx.compose.ui.unit.Density
 import com.chrisjenx.compose2pdf.PdfPageConfig
 import com.chrisjenx.compose2pdf.RenderMode
+import com.chrisjenx.compose2pdf.fixtures.PdfLinkFixture
 import com.chrisjenx.compose2pdf.renderToPdf
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink

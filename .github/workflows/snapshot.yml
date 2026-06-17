@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   snapshot:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
         with:
@@ -29,6 +29,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      - uses: android-actions/setup-android@v4
 
       - uses: gradle/actions/setup-gradle@v5
 
@@ -42,7 +44,7 @@ jobs:
           fi
 
       - name: Build and test
-        run: xvfb-run ./gradlew :compose2pdf:build :compose2pdf:test :fidelity-test:test
+        run: ./gradlew :compose2pdf:build :compose2pdf:test :fidelity-test:test
 
       - name: Publish snapshot
         env:

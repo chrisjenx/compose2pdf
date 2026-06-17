@@ -6,6 +6,9 @@ nav_order: 5
 
 # Server-side Integration
 
+{: .note }
+This guide applies to **JVM only**. Server-side PDF generation requires the JVM target with JDK 17+ and AWT support.
+
 compose2pdf works well for server-side PDF generation. The `OutputStream` overloads let you stream PDFs directly to HTTP responses without buffering the entire document as a `ByteArray`.
 
 ---

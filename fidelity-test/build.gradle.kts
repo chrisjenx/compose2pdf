@@ -6,7 +6,9 @@ plugins {
 
 dependencies {
     testImplementation(project(":compose2pdf"))
+    testImplementation(project(":test-fixtures"))
     testImplementation(compose.desktop.currentOs)
+    testImplementation(compose.material3)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.pdfbox)

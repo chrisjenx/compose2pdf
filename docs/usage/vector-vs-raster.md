@@ -6,7 +6,10 @@ nav_order: 9
 
 # Vector vs Raster Mode
 
-compose2pdf supports two rendering modes. Choose the right one for your use case.
+{: .note }
+This page applies to **JVM only**. Android and iOS always produce vector output — there is no `RenderMode` parameter on those platforms.
+
+compose2pdf supports two rendering modes on JVM. Choose the right one for your use case.
 
 ---
 

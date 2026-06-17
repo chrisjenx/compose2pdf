@@ -1,6 +1,6 @@
 title: compose2pdf
-description: "Kotlin JVM library for rendering Compose Desktop content to production-quality PDFs with vector text, embedded fonts, auto-pagination, and server-side streaming."
-tagline: "Kotlin PDF library for Compose Desktop"
+description: "Kotlin Multiplatform library for rendering Compose content to production-quality PDFs on JVM, Android, and iOS — vector text, embedded fonts, and auto-pagination."
+tagline: "Kotlin Multiplatform PDF library"
 remote_theme: just-the-docs/just-the-docs@v0.10.0
 author: Christopher Jenkins
 lang: en

@@ -4,7 +4,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.chrisjenx/compose2pdf)](https://central.sonatype.com/artifact/com.chrisjenx/compose2pdf)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-A **Kotlin JVM library** for rendering [Compose Desktop](https://www.jetbrains.com/compose-multiplatform/) content directly to PDF. Generate production-quality PDF documents with vector text, embedded fonts, auto-pagination, and server-side streaming support.
+A **Kotlin Multiplatform library** for rendering [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/) content directly to PDF. Generate production-quality PDF documents on **JVM/Desktop**, **Android**, and **iOS** with vector text, embedded fonts, and auto-pagination.
 
 ```kotlin
 val pdfBytes = renderToPdf {
@@ -24,9 +24,9 @@ File("hello.pdf").writeBytes(pdfBytes)
 ## Features
 
 - **Vector PDF output** — text is selectable, scales to any zoom level
-- **Raster fallback** — pixel-perfect rendering as an embedded image
-- **Font embedding** — bundled Inter fonts or system font resolution with automatic subsetting
-- **Link annotations** — clickable URLs in the PDF via `PdfLink`
+- **Raster fallback** — pixel-perfect rendering as an embedded image (JVM)
+- **Font embedding** — bundled Inter fonts (JVM) or system font resolution with automatic subsetting
+- **Link annotations** — clickable URLs in the PDF via `PdfLink` (JVM)
 - **Auto-pagination** — content automatically flows across pages; elements are kept together at page boundaries
 - **Multi-page** — render multiple pages in a single PDF (manual or automatic)
 - **Page presets** — A4, Letter, A3 with configurable margins and landscape support
@@ -35,13 +35,40 @@ File("hello.pdf").writeBytes(pdfBytes)
 ## Installation
 
 ```kotlin
-// build.gradle.kts
+// build.gradle.kts (Kotlin Multiplatform)
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.chrisjenx:compose2pdf:1.0.0")
+        }
+    }
+}
+
+// Or for JVM/Android-only projects:
 dependencies {
     implementation("com.chrisjenx:compose2pdf:1.0.0")
 }
 ```
 
-Requires **JDK 17+** and **Compose Desktop** (Compose Multiplatform 1.9+).
+## Platform support
+
+| Platform | Requirements | Status |
+|:---------|:-------------|:-------|
+| **JVM/Desktop** (macOS, Linux, Windows) | JDK 17+, Compose Multiplatform 1.9+ | Full support |
+| **Android** | minSdk 24, Compose Multiplatform 1.9+ | Full support |
+| **iOS** (arm64, x64, simulatorArm64) | Compose Multiplatform 1.9+ | Full support |
+
+### Platform feature matrix
+
+| Feature | JVM | Android | iOS |
+|:--------|:---:|:-------:|:---:|
+| Vector output | VECTOR / RASTER modes | Always vector | Always vector |
+| Auto-pagination | Yes | Yes | Yes |
+| Multi-page (manual) | Yes | -- | -- |
+| OutputStream streaming | Yes | Yes | -- |
+| `PdfLink` annotations | Yes | -- | -- |
+| Bundled Inter font | Yes | -- (system fonts) | -- (system fonts) |
+| `suspend` API | No | Yes (required) | No |
 
 ## Compatibility
 
@@ -55,19 +82,9 @@ Tested weekly against the 3 most recent Compose Multiplatform releases:
 | **1.10.3** | 2.3.20 | CI tested (current) |
 | 1.9.3 | 2.3.20 | CI tested |
 
-**Platform support:**
-
-| | JDK 17+ | JDK 21+ |
-|:---|:-------:|:-------:|
-| **macOS** (arm64, x64) | Supported | Supported |
-| **Linux** (x64) | Supported | Supported |
-| **Windows** (x64) | Supported | Supported |
-
-> Compose Desktop is JVM-only. Android and iOS are not supported.
-
 ## Quick start
 
-### Single page
+### JVM
 
 ```kotlin
 val pdf = renderToPdf(
@@ -77,6 +94,31 @@ val pdf = renderToPdf(
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Text("Invoice #1234", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text("Amount: $1,250.00")
+    }
+}
+```
+
+### Android
+
+```kotlin
+val pdfBytes = renderToPdf(
+    context = applicationContext,
+    config = PdfPageConfig.A4WithMargins,
+) {
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        Text("Hello from Android!")
+    }
+}
+```
+
+### iOS
+
+```kotlin
+val pdfBytes = renderToPdf(
+    config = PdfPageConfig.A4WithMargins,
+) {
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        Text("Hello from iOS!")
     }
 }
 ```
@@ -93,7 +135,7 @@ val pdf = renderToPdf(config = PdfPageConfig.A4WithMargins) {
 }
 ```
 
-### Manual multi-page
+### Manual multi-page (JVM)
 
 For full control over what goes on each page:
 
@@ -105,7 +147,7 @@ val pdf = renderToPdf(pages = 3) { pageIndex ->
 }
 ```
 
-### Links
+### Links (JVM)
 
 ```kotlin
 PdfLink(href = "https://example.com") {
@@ -115,12 +157,11 @@ PdfLink(href = "https://example.com") {
 
 ## How it works
 
-compose2pdf renders Compose content through a **Skia SVGCanvas → Apache PDFBox** pipeline:
+Each platform uses a native PDF pipeline:
 
-1. Your `@Composable` content is rendered by Compose Desktop's layout engine
-2. Skia's SVGCanvas captures the draw calls as SVG
-3. compose2pdf converts the SVG to PDF vector commands via PDFBox
-4. Fonts are resolved, subsetted, and embedded; link annotations are mapped to PDF coordinates
+- **JVM**: Compose → Skia SVGCanvas → SVG → Apache PDFBox → vector PDF with embedded fonts
+- **Android**: Compose → off-screen virtual display → `android.graphics.pdf.PdfDocument` Canvas → vector PDF
+- **iOS**: Compose → Skia SVGCanvas → SVG → Core Graphics (`CGPDFContext`) → vector PDF
 
 > **Want native PDF output from Skia?** The [Skiko PR #775](https://github.com/JetBrains/skiko/pull/775) proposes adding a direct PDF backend to Skia/Skiko, which would eliminate the SVG intermediary entirely — producing smaller files, faster rendering, and full gradient/effect support in vector mode. If this matters to you, upvote the PR!
 

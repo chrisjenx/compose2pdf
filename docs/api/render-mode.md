@@ -15,6 +15,9 @@ enum class RenderMode {
 }
 ```
 
+{: .important }
+The `RenderMode` parameter is only accepted by the **JVM** `renderToPdf` API. Android always produces vector output via `android.graphics.pdf.PdfDocument`'s Skia-backed Canvas. iOS always produces vector output via Core Graphics. The enum is defined in `commonMain` but is not a parameter on Android or iOS.
+
 ---
 
 ## Values
@@ -33,7 +36,7 @@ The rendering pipeline: Compose -> ImageComposeScene -> BufferedImage -> PDFBox 
 
 ---
 
-## Usage
+## Usage (JVM only)
 
 ```kotlin
 // Vector (default)
@@ -47,4 +50,4 @@ val pdf = renderToPdf(mode = RenderMode.RASTER, density = Density(3f)) { content
 
 ## See also
 
-- [Usage: Vector vs Raster]({{ site.baseurl }}/usage/vector-vs-raster) -- Detailed comparison and decision guide
+- [Usage: Vector vs Raster]({{ site.baseurl }}/usage/vector-vs-raster) -- Detailed comparison and decision guide (JVM)

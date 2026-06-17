@@ -17,5 +17,6 @@ dependencyResolutionManagement {
 rootProject.name = "compose2pdf"
 
 include(":compose2pdf")
+include(":test-fixtures")
 include(":fidelity-test")
 include(":examples")

@@ -8,11 +8,6 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 
 /**
- * Exception thrown when PDF rendering fails.
- */
-class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
-
-/**
  * Renders Compose content to a PDF and writes it to [outputStream].
  *
  * This is the streaming variant — it writes the PDF directly to the given [OutputStream]
