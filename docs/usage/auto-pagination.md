@@ -55,6 +55,24 @@ renderToPdf {
 {: .note }
 Place content items as **direct children** rather than wrapping in a single `Column`. The library can only keep direct children together.
 
+### Using `PaginatedColumn` inside wrappers
+
+If you need to wrap content in a provider, theme, or layout container, use the public [`PaginatedColumn`]({{ site.baseurl }}/api/paginated-column) composable inside the wrapper to restore per-child page breaking:
+
+```kotlin
+renderToPdf(config = PdfPageConfig.A4WithMargins) {
+    MyThemeProvider {              // auto-pagination sees 1 child
+        PaginatedColumn {          // restores per-child page breaking
+            Section1()             // keep-together unit
+            Section2()             // keep-together unit
+            Section3()             // keep-together unit
+        }
+    }
+}
+```
+
+`PaginatedColumn` reads the page configuration automatically from the composition — no parameters needed beyond `modifier` and `content`.
+
 ---
 
 ## Oversized children
@@ -130,6 +148,7 @@ FileOutputStream("report.pdf").use { out ->
 
 ## See also
 
+- [API Reference: PaginatedColumn]({{ site.baseurl }}/api/paginated-column) -- Public composable for fine-grained page breaks
 - [Multi-page Documents]({{ site.baseurl }}/usage/multi-page) -- Manual pagination
 - [API Reference: renderToPdf]({{ site.baseurl }}/api/render-to-pdf) -- Full API signatures
 - [Best Practices]({{ site.baseurl }}/guides/best-practices) -- Tips for auto-pagination

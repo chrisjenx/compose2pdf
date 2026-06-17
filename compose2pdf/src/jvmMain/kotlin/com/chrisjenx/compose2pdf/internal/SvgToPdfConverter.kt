@@ -28,33 +28,30 @@ internal object SvgToPdfConverter {
 
     private val logger = java.util.logging.Logger.getLogger(SvgToPdfConverter::class.java.name)
 
+    /**
+     * Adds a single page rendering [svg] into the content area defined by [layout].
+     * The SVG is rendered at content-area pixel dimensions; this function applies the
+     * margin offset, clips to the content area, and converts pixels to PDF points.
+     */
     fun addPage(
         pdfDoc: PDDocument,
         svg: String,
-        pageWidthPt: Float,
-        pageHeightPt: Float,
+        layout: PageLayout,
+        density: Float,
         fontCache: MutableMap<String, PDFont> = mutableMapOf(),
         imageCache: MutableMap<String, PDImageXObject> = mutableMapOf(),
     ) {
         val (svgRoot, defs) = parseSvg(svg)
-
-        val svgWidth = svgRoot.getAttribute("width").toFloatOrNull() ?: pageWidthPt
-        val svgHeight = svgRoot.getAttribute("height").toFloatOrNull() ?: pageHeightPt
-        val scaleX = pageWidthPt / svgWidth
-        val scaleY = pageHeightPt / svgHeight
-
-        val mediaBox = PDRectangle(pageWidthPt, pageHeightPt)
-        val page = PDPage(mediaBox)
-        pdfDoc.addPage(page)
-
-        val cs = PDPageContentStream(pdfDoc, page)
-        try {
-            // PDF: bottom-left origin. SVG: top-left. Flip Y and scale.
-            cs.transform(CoordinateTransform.svgToPageMatrix(scaleX, scaleY, pageHeightPt))
-            PageRenderer(cs, pdfDoc, defs, fontCache, imageCache).renderChildren(svgRoot)
-        } finally {
-            cs.close()
-        }
+        renderSvgToContentArea(
+            pdfDoc = pdfDoc,
+            svgRoot = svgRoot,
+            defs = defs,
+            layout = layout,
+            density = density,
+            verticalOffsetPt = 0f,
+            fontCache = fontCache,
+            imageCache = imageCache,
+        )
     }
 
     /**
@@ -78,17 +75,26 @@ internal object SvgToPdfConverter {
             .toInt().coerceIn(1, maxPages)
 
         for (pageIndex in 0 until pageCount) {
-            addPageSlice(pdfDoc, svgRoot, defs, layout, pageIndex, density, fontCache, imageCache)
+            renderSvgToContentArea(
+                pdfDoc = pdfDoc,
+                svgRoot = svgRoot,
+                defs = defs,
+                layout = layout,
+                density = density,
+                verticalOffsetPt = pageIndex * layout.contentHeightPt,
+                fontCache = fontCache,
+                imageCache = imageCache,
+            )
         }
     }
 
-    private fun addPageSlice(
+    private fun renderSvgToContentArea(
         pdfDoc: PDDocument,
         svgRoot: Element,
         defs: Map<String, Element>,
         layout: PageLayout,
-        pageIndex: Int,
         density: Float,
+        verticalOffsetPt: Float,
         fontCache: MutableMap<String, PDFont>,
         imageCache: MutableMap<String, PDImageXObject>,
     ) {
@@ -103,10 +109,13 @@ internal object SvgToPdfConverter {
             cs.clip()
 
             val scale = 1f / density
-            val verticalOffsetPt = pageIndex * layout.contentHeightPt
             cs.transform(
                 CoordinateTransform.contentAreaMatrix(
-                    scale, layout.marginLeftPt, layout.marginTopPt, layout.pageHeightPt, verticalOffsetPt,
+                    scale,
+                    layout.marginLeftPt,
+                    layout.marginTopPt,
+                    layout.pageHeightPt,
+                    verticalOffsetPt,
                 )
             )
 
@@ -308,8 +317,8 @@ internal object SvgToPdfConverter {
             applyTransform(elem); applyOpacity(elem)
 
             val fontSize = attr(elem, "font-size")?.toFloatOrNull() ?: 12f
-            val text = elem.textContent.trim()
-            if (text.isEmpty()) return restore()
+            val rawText = elem.textContent.trim()
+            if (rawText.isEmpty()) return restore()
 
             val fillColor = attr(elem, "fill")
                 ?.takeIf { it != "none" }
@@ -325,9 +334,12 @@ internal object SvgToPdfConverter {
             )
 
             val xAttr = attr(elem, "x") ?: ""
-            val xPositions = xAttr.split(",").mapNotNull { it.trim().toFloatOrNull() }
+            val rawXPositions = xAttr.split(",").mapNotNull { it.trim().toFloatOrNull() }
             val yOffset = (attr(elem, "y") ?: "").split(",")
                 .firstOrNull()?.trim()?.toFloatOrNull() ?: fontSize
+
+            // Decompose Unicode ligatures that PDFBox fonts may lack cmap entries for
+            val (text, xPositions) = TextNormalizer.normalize(rawText, rawXPositions, fontSize)
 
             // Counter-flip Y for text (undo global Y-flip so glyphs render right-side up)
             cs.transform(CoordinateTransform.textCounterFlipMatrix(yOffset))

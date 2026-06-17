@@ -93,6 +93,7 @@ renderToPdf(config, density, defaultFontFamily, pagination) { content } → Byte
 
 ```kotlin
 PdfLink(href) { content }
+PaginatedColumn(modifier) { content }  // page-break-aware Column, reads page config automatically
 PdfRoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)
 Shape.asPdfSafe()
 ```
@@ -108,7 +109,7 @@ Shape.asPdfSafe()
 | `PdfLink` annotations | Yes | No | No |
 | Auto-pagination | Yes | Yes | Yes |
 
-Types: `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `Density`, `RenderMode` (JVM), `InterFontFamily` (JVM), `Compose2PdfException`.
+Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargins + `landscape()`), `PdfMargins` (None/Narrow/Normal + `symmetric()`), `PdfPagination` (AUTO/SINGLE_PAGE), `Density`, `RenderMode` (VECTOR/RASTER, JVM-only), `InterFontFamily` (JVM-only), `Compose2PdfException`, `LocalPdfPageConfig`.
 
 ## Key Files
 
@@ -235,8 +236,8 @@ Compose content → CanvasLayersComposeScene → Skia SVGCanvas → SVG string
 - Internal implementation in `com.chrisjenx.compose2pdf.internal`
 - `internal` visibility by default for implementation classes
 - Platform-specific implementations use file-level platform suffixes (e.g., `Compose2Pdf.android.kt`, `Compose2Pdf.ios.kt`)
-- Public API (JVM): `renderToPdf()`, `PdfLink()`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
-- Public API (Android/iOS): `renderToPdf()`, `PdfLink()`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `Density`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException`
+- Public API (JVM): `renderToPdf()`, `PdfLink()`, `PaginatedColumn()`, `LocalPdfPageConfig`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
+- Public API (Android/iOS): `renderToPdf()`, `PdfLink()`, `PaginatedColumn()`, `LocalPdfPageConfig`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `Density`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException`
 - Tests use `kotlin-test`
 
 ## Publishing

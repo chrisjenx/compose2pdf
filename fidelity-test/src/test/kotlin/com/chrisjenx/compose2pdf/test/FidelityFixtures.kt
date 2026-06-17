@@ -54,6 +54,13 @@ val fidelityFixtures: List<Fixture> = sharedFixtures.map { sf ->
     Fixture("gradient-image", "basic", "Horizontal gradient via thin vertical strips") { GradientImageFixture() },
     Fixture("multiple-images", "basic", "6 images in a 2x3 grid") { MultipleImagesFixture() },
     Fixture("scaled-image", "basic", "32x32 checkerboard at 32dp, 64dp, 128dp sizes") { ScaledImageFixture() },
+    // Page margins (JVM vector path) -- regression fixture for page-margin support
+    Fixture(
+        "page-with-margins",
+        "page-size",
+        "A4 with Normal (72dp) margins -- content must render inside content area",
+        config = PdfPageConfig.A4WithMargins,
+    ) { PageWithMarginsFixture() },
 )
 
 // -- Skia-only fixtures (require org.jetbrains.skia for bitmap creation) --
@@ -304,6 +311,27 @@ private fun ScaledImageFixture() {
                 Image(bitmap = checkerboard, contentDescription = "128dp", modifier = Modifier.size(128.dp))
                 Text("128dp", fontSize = 10.sp)
             }
+        }
+    }
+}
+
+// -- Page-margin regression fixture (JVM vector path) --
+
+@Composable
+private fun PageWithMarginsFixture() {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE3F2FD))
+            .border(2.dp, Color(0xFF1565C0))
+            .padding(16.dp)
+    ) {
+        Column {
+            Text("Margin test", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("This box must render inside the 72dp page margins.", fontSize = 12.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("If margins are ignored, the blue border would touch the page edge.", fontSize = 12.sp)
         }
     }
 }
