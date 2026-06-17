@@ -42,6 +42,18 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # Compose Multiplatform 1.11+ ships Skiko built against a newer iOS SDK
+      # (auto-links the UIUtilities framework), so linking the iOS test binary
+      # needs a newer Xcode than the runner's default. Select the latest Xcode
+      # installed on the image (the macOS runners ship several).
+      - name: Select latest Xcode (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n1)
+          echo "Selecting $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
       - name: Override versions
         run: |
           perl -i -pe "s/^kotlin = .*/kotlin = \"${{ matrix.version.kotlin-version }}\"/" gradle/libs.versions.toml
