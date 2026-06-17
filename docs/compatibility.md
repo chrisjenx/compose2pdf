@@ -59,7 +59,6 @@ JDK 17 is the minimum — enforced by `jvmToolchain(17)` in the build. Later JDK
 | Target | Status |
 |:-------|:-------|
 | **iosArm64** | Supported (device) |
-| **iosX64** | Supported (Intel simulator) |
 | **iosSimulatorArm64** | CI tested (Apple Silicon simulator) |
 
 ---

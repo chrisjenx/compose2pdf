@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **Kotlin Multiplatform** -- compose2pdf now targets JVM, Android, and iOS
 - **Android support** -- renders PDFs via `android.graphics.pdf.PdfDocument` (zero external dependencies). Suspend API with `Context` parameter. Always produces vector output
-- **iOS support** -- renders PDFs via Core Graphics (`CGPDFContext`). Supports iosArm64, iosX64, and iosSimulatorArm64 targets
+- **iOS support** -- renders PDFs via Core Graphics (`CGPDFContext`). Supports iosArm64 and iosSimulatorArm64 targets (Apple Silicon)
 - **Auto-pagination on all platforms** -- content automatically flows across pages on JVM, Android, and iOS
 - **`test-fixtures` module** -- shared multiplatform test utilities for JVM, Android, and iOS
 
