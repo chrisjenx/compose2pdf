@@ -45,7 +45,7 @@ Visual regression suite comparing Compose reference renders against rasterized P
 
 GitHub Actions (`.github/workflows/ci.yml`): build + unit tests + fidelity tests on ubuntu/macos, JDK 17. Uses `xvfb-run` for headless Compose on Linux.
 
-Compose Multiplatform compatibility matrix (`.github/workflows/compatibility.yml`): tests against the 3 most recent CMP versions (defined in `.github/compose-versions.json`). Auto-updated weekly by `.github/workflows/update-compose-versions.yml`.
+Compose Multiplatform compatibility matrix (`.github/workflows/compatibility.yml`): tests against the 3 most recent CMP versions (defined in `.github/compose-versions.json`). Auto-updated weekly by `.github/workflows/update-compose-versions.yml`. The matrix compiles the **same** source against each version, so version-incompatible internal Compose APIs are handled via the `cmpLegacy`/`cmpNext` source variants (see Gotchas → Rendering).
 
 ## Public API
 
@@ -100,6 +100,7 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 
 ### Rendering
 - **`@InternalComposeUiApi` opt-in required** — `CanvasLayersComposeScene` is internal Compose API
+- **Version-specific scene driver** — `CanvasLayersComposeScene` is `@InternalComposeUiApi` ("subject to change without notice in major/minor/patch") and was reshaped in CMP 1.12 (`coroutineContext`/`invalidate` + `render(canvas, nanoTime)` → `frameRecomposer` + `measureAndLayout`/`draw(canvas)`). The scene drive lives in `internal ComposeSceneRenderer.drawContent()`, which ships as two source variants — `compose2pdf/src/cmpLegacy/kotlin` (CMP ≤ 1.11) and `compose2pdf/src/cmpNext/kotlin` (CMP ≥ 1.12). `build.gradle.kts` adds the matching one to the `main` source set based on the resolved Compose version. **Keep both variants' `drawContent` signature in sync** — only one is ever compiled, and `ComposeToSvg` calls it. Bump the `>= 1.12` cutoff if a future CMP version reshapes the API again.
 - **Variable fonts excluded** — `FontResolver.isVariableFont()` skips fonts with `fvar` table
 - **SVGCanvas bezier approximation** — non-uniform rounded rects become complex bezier paths; use `PdfRoundedCornerShape`
 - **Bundled fonts loaded from classpath** — `FontResolver` loads Inter fonts directly from `InputStream`, no temp files
