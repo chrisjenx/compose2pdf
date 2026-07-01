@@ -100,8 +100,17 @@ jobs:
           echo "Generated matrix:"
           cat .github/compose-versions.json
 
-          # Check if anything changed
-          if git diff --quiet .github/compose-versions.json; then
+          # The published library is one binary — pin its build base to the highest
+          # STABLE detected Compose version (never a pre-release) + the latest Kotlin,
+          # so we always ship against the currently-released CMP. The docs-regeneration
+          # step below picks up the new pin.
+          BASE_COMPOSE=$(echo "$LATEST_STABLE" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          echo "Build base -> Compose $BASE_COMPOSE + Kotlin $LATEST_KOTLIN"
+          perl -i -pe "s/^compose-multiplatform = .*/compose-multiplatform = \"$BASE_COMPOSE\"/" gradle/libs.versions.toml
+          perl -i -pe "s/^kotlin = .*/kotlin = \"$LATEST_KOTLIN\"/" gradle/libs.versions.toml
+
+          # Check if anything changed (matrix or build-base pin; docs regenerate in a later step)
+          if git diff --quiet .github/compose-versions.json gradle/libs.versions.toml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -131,10 +140,15 @@ jobs:
             ${{ steps.detect.outputs.matrix }}
             ```
 
-            The compatibility tables in `docs/compatibility.md` and `README.md` have been regenerated from the matrix.
+            This PR also bumps the shipped build base in `gradle/libs.versions.toml` to the
+            latest stable Compose/Kotlin (the library ships one binary, built against the
+            currently-released CMP). The compatibility tables in `docs/compatibility.md` and
+            `README.md` have been regenerated from the matrix and the new pin.
 
-            The compatibility CI will run on this PR to verify all versions build and pass tests.
-            If a version fails, adjust its `kotlin-version` in `.github/compose-versions.json` before merging.
+            The compatibility CI will run on this PR to verify the shipped binary runs against
+            every version in the matrix. If a stable version fails, drop it from
+            `.github/compose-versions.json` (or change the base) before merging; pre-release
+            failures are informational.
           branch: auto/update-compose-versions
           labels: dependencies
           commit-message: "Update Compose Multiplatform compatibility matrix"
