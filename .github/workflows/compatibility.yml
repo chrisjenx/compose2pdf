@@ -21,6 +21,9 @@ jobs:
       - id: load
         run: echo "matrix=$(jq -c '.versions' .github/compose-versions.json)" >> "$GITHUB_OUTPUT"
 
+  # Publishes the ONE library artifact (built against the pinned base) to mavenLocal,
+  # then runs a standalone consumer against each target Compose runtime. This tests the
+  # binary we actually ship, not a per-version recompile.
   test:
     needs: load-versions
     strategy:
@@ -42,13 +45,30 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Override versions
-        run: |
-          perl -i -pe "s/^kotlin = .*/kotlin = \"${{ matrix.version.kotlin-version }}\"/" gradle/libs.versions.toml
-          perl -i -pe "s/^compose-multiplatform = .*/compose-multiplatform = \"${{ matrix.version.compose-version }}\"/" gradle/libs.versions.toml
-          echo "Testing CMP ${{ matrix.version.compose-version }} + Kotlin ${{ matrix.version.kotlin-version }}"
+      - name: Publish library to Maven Local (built against pinned base)
+        run: ./gradlew :compose2pdf:publishToMavenLocal
 
-      - name: Build and test
-        # Also compile the fidelity-test sources (compile-only, no display needed) so a CMP-version
-        # break in the test suite's own scene driver fails the matrix instead of hiding until a real bump.
-        run: ./gradlew :compose2pdf:build :fidelity-test:compileTestKotlin
+      - name: Resolve published library version
+        id: lib
+        run: echo "version=$(grep '^version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      # The one published binary is expected to run on EVERY matrix version (the scene
+      # driver resolves the CMP API by reflection). Pre-release cells (version contains '-')
+      # stay non-blocking only as a guard against unrelated beta breakage, not the API boundary.
+      - name: Compatibility smoke test (Linux)
+        if: runner.os == 'Linux'
+        continue-on-error: ${{ contains(matrix.version.compose-version, '-') }}
+        run: >
+          xvfb-run ./gradlew -p compat-consumer run
+          -PcomposeVersion=${{ matrix.version.compose-version }}
+          -PkotlinVersion=${{ matrix.version.kotlin-version }}
+          -Pcompose2pdfVersion=${{ steps.lib.outputs.version }}
+
+      - name: Compatibility smoke test (macOS)
+        if: runner.os == 'macOS'
+        continue-on-error: ${{ contains(matrix.version.compose-version, '-') }}
+        run: >
+          ./gradlew -p compat-consumer run
+          -PcomposeVersion=${{ matrix.version.compose-version }}
+          -PkotlinVersion=${{ matrix.version.kotlin-version }}
+          -Pcompose2pdfVersion=${{ steps.lib.outputs.version }}
