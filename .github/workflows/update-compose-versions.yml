@@ -112,6 +112,9 @@ jobs:
 
       - name: Regenerate compatibility tables in docs + README
         if: steps.detect.outputs.changed == 'true'
+        # Never let a docs-regeneration hiccup block the version-bump PR; CI's docs-sync
+        # check (ci.yml) is the gate that surfaces a stale/broken table on the PR.
+        continue-on-error: true
         run: python3 .github/scripts/render-compat-tables.py
 
       - name: Create Pull Request

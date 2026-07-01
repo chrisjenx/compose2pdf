@@ -47,7 +47,7 @@ GitHub Actions (`.github/workflows/ci.yml`): build + unit tests + fidelity tests
 
 Compose Multiplatform compatibility matrix (`.github/workflows/compatibility.yml`): tests against the 3 most recent CMP versions (defined in `.github/compose-versions.json`). Auto-updated weekly by `.github/workflows/update-compose-versions.yml`. The matrix compiles the **same** source against each version, so version-incompatible internal Compose APIs are handled via the `cmpLegacy`/`cmpNext` source variants (see Gotchas → Rendering).
 
-`.github/compose-versions.json` is the single source of truth for supported versions. The human-facing tables in `docs/compatibility.md` and `README.md` are **generated** from it by `.github/scripts/render-compat-tables.py` (run in the update workflow) between `<!-- BEGIN cmp-matrix -->` / `<!-- END cmp-matrix -->` markers — edit the JSON and rerun the script, never the tables by hand. The **current** row is whichever matrix entry matches the pinned `compose-multiplatform` in `libs.versions.toml`.
+`.github/compose-versions.json` is the single source of truth for supported versions. The human-facing tables in `docs/compatibility.md` and `README.md` are **generated** from it by `.github/scripts/render-compat-tables.py` (run in the update workflow) between `<!-- BEGIN cmp-matrix -->` / `<!-- END cmp-matrix -->` markers — edit the JSON and rerun the script, never the tables by hand. The **current** row is whichever matrix entry matches the pinned `compose-multiplatform` in `libs.versions.toml`, and shows the pinned `kotlin` (not the matrix's CI Kotlin override). CI's `docs-sync` job (`ci.yml`) runs the script with `--check` and fails the PR if the tables have drifted.
 
 ## Public API
 
