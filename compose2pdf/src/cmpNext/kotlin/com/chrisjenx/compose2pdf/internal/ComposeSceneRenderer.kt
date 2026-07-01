@@ -39,18 +39,22 @@ internal object ComposeSceneRenderer {
         content: @Composable () -> Unit,
     ) {
         val frameRecomposer = FrameRecomposer(Dispatchers.Unconfined)
-        val scene = CanvasLayersComposeScene(
-            frameRecomposer = frameRecomposer,
-            density = density,
-            size = IntSize(widthPx, heightPx),
-        )
         try {
-            scene.setContent(content = content)
-            frameRecomposer.performFrame(0L)
-            scene.measureAndLayout()
-            scene.draw(canvas.asComposeCanvas())
+            val scene = CanvasLayersComposeScene(
+                frameRecomposer = frameRecomposer,
+                density = density,
+                size = IntSize(widthPx, heightPx),
+            )
+            try {
+                scene.setContent(content = content)
+                frameRecomposer.performFrame(0L)
+                scene.measureAndLayout()
+                scene.draw(canvas.asComposeCanvas())
+            } finally {
+                scene.close()
+            }
         } finally {
-            scene.close()
+            // Nested so the recomposer is always released, even if scene construction or close throws.
             frameRecomposer.close()
         }
     }

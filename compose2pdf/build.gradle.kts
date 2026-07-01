@@ -19,16 +19,19 @@ dependencies {
 // matching one is added to the main source set based on the resolved Compose version:
 //   cmpLegacy -> CMP <= 1.11 (coroutineContext/invalidate + render)
 //   cmpNext   -> CMP >= 1.12 (frameRecomposer + measureAndLayout/draw)
+val composeVersion: String = libs.versions.compose.multiplatform.get()
 val composeSceneVariant: String = run {
-    val parts = libs.versions.compose.multiplatform.get().substringBefore('-').split('.')
-    val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
-    val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val parts = composeVersion.substringBefore('-').split('.')
+    val major = parts.getOrNull(0)?.toIntOrNull()
+    val minor = parts.getOrNull(1)?.toIntOrNull()
+    // Fail loudly rather than silently defaulting to a variant that may not compile against this version.
+    if (major == null || minor == null) {
+        error("compose2pdf: cannot parse Compose Multiplatform version '$composeVersion' to select the scene-driver variant")
+    }
     if (major > 1 || (major == 1 && minor >= 12)) "cmpNext" else "cmpLegacy"
 }
-logger.info(
-    "compose2pdf: using '$composeSceneVariant' ComposeSceneRenderer for Compose " +
-        libs.versions.compose.multiplatform.get()
-)
+// lifecycle level so the chosen variant is visible in the compatibility matrix (and normal) builds.
+logger.lifecycle("compose2pdf: using '$composeSceneVariant' ComposeSceneRenderer for Compose $composeVersion")
 
 kotlin {
     jvmToolchain(17)

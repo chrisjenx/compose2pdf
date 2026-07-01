@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Density
 import org.jetbrains.skia.OutputWStream
+import org.jetbrains.skia.Picture
 import org.jetbrains.skia.PictureRecorder
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.svg.SVGCanvas
@@ -39,14 +40,7 @@ internal object ComposeToSvg {
         content: @Composable () -> Unit,
     ): String {
         // Step 1: Record Compose draw commands via PictureRecorder
-        val recorder = PictureRecorder()
-        val recordCanvas = recorder.beginRecording(
-            Rect.makeWH(widthPx.toFloat(), heightPx.toFloat())
-        )
-
-        ComposeSceneRenderer.drawContent(recordCanvas, widthPx, heightPx, density, content)
-
-        val picture = recorder.finishRecordingAsPicture()
+        val picture = recordScene(widthPx, heightPx, density, content)
 
         // Step 2: Replay onto SVGCanvas to get vector SVG
         val baos = ByteArrayOutputStream()
@@ -122,18 +116,33 @@ internal object ComposeToSvg {
         content: @Composable () -> Unit,
     ): Int {
         var measuredHeight = 0
-        val recorder = PictureRecorder()
-        val recordCanvas = recorder.beginRecording(
-            Rect.makeWH(widthPx.toFloat(), maxHeightPx.toFloat())
-        )
-        ComposeSceneRenderer.drawContent(recordCanvas, widthPx, maxHeightPx, density) {
+        // Record only to drive composition + layout; the resulting picture is discarded (no SVG).
+        recordScene(widthPx, maxHeightPx, density) {
             Box(Modifier.onGloballyPositioned { coords ->
                 measuredHeight = coords.size.height
             }) {
                 content()
             }
-        }
-        recorder.finishRecordingAsPicture().close()
+        }.close()
         return measuredHeight
+    }
+
+    /**
+     * Records [content] into a Skia [Picture] at the given size/density, driving composition, layout,
+     * and draw via the version-specific [ComposeSceneRenderer]. Shared by [render] (which replays the
+     * picture onto an SVGCanvas) and [measureContentHeight] (which discards it after measurement).
+     */
+    private fun recordScene(
+        widthPx: Int,
+        heightPx: Int,
+        density: Density,
+        content: @Composable () -> Unit,
+    ): Picture {
+        val recorder = PictureRecorder()
+        val recordCanvas = recorder.beginRecording(
+            Rect.makeWH(widthPx.toFloat(), heightPx.toFloat())
+        )
+        ComposeSceneRenderer.drawContent(recordCanvas, widthPx, heightPx, density, content)
+        return recorder.finishRecordingAsPicture()
     }
 }
