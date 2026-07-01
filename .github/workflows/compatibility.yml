@@ -52,8 +52,9 @@ jobs:
         id: lib
         run: echo "version=$(grep '^version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
-      # Pre-release targets (version contains '-') are informational: the shipped
-      # cmpLegacy binary is not expected to run on a cmpNext runtime.
+      # The one published binary is expected to run on EVERY matrix version (the scene
+      # driver resolves the CMP API by reflection). Pre-release cells (version contains '-')
+      # stay non-blocking only as a guard against unrelated beta breakage, not the API boundary.
       - name: Compatibility smoke test (Linux)
         if: runner.os == 'Linux'
         continue-on-error: ${{ contains(matrix.version.compose-version, '-') }}
