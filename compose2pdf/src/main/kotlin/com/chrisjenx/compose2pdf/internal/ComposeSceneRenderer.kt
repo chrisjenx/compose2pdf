@@ -14,7 +14,6 @@ import java.lang.reflect.Constructor
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import kotlin.coroutines.CoroutineContext
 import org.jetbrains.skia.Canvas
 
 /**
@@ -28,8 +27,9 @@ import org.jetbrains.skia.Canvas
  * API by reflection at runtime, detecting the shape by structure (presence of `FrameRecomposer`
  * and factory arity) rather than a version string. One jar therefore runs on 1.11 and 1.12+.
  *
- * Everything stable stays typed; only the divergent construction/drive calls are reflective. If
- * neither known shape resolves, [drawContent] fails fast with a descriptive [Compose2PdfException].
+ * Everything stable stays typed; only the divergent construction/drive calls are reflective, and
+ * the reflection handles are resolved once (they are instance-independent) and reused per render.
+ * If neither known shape resolves, [drawContent] fails fast with a descriptive [Compose2PdfException].
  */
 internal object ComposeSceneRenderer {
 
@@ -58,6 +58,17 @@ internal object ComposeSceneRenderer {
 
     private val NO_OP: () -> Unit = {}
 
+    private val composeSceneClass: Class<*> by lazy {
+        classOrNull(COMPOSE_SCENE) ?: fail("$COMPOSE_SCENE not found")
+    }
+
+    // PlatformContext.Empty is a stateless `class` (public no-arg ctor) in both 1.11 and 1.12; one
+    // shared empty instance is reused across renders (a scene keeps no mutable state on it).
+    private val platformContext: Any by lazy {
+        val cls = classOrNull(PLATFORM_CONTEXT_EMPTY) ?: fail("$PLATFORM_CONTEXT_EMPTY not found")
+        cls.getDeclaredConstructor().make()
+    }
+
     private fun classOrNull(name: String): Class<*>? =
         try {
             Class.forName(name)
@@ -74,7 +85,7 @@ internal object ComposeSceneRenderer {
         )
 
     /** The single static factory on [FACTORY_CLASS] returning a ComposeScene with [paramCount] params. */
-    private fun factory(paramCount: Int): Method {
+    private fun findFactory(paramCount: Int): Method {
         val cls = classOrNull(FACTORY_CLASS) ?: fail("$FACTORY_CLASS not found")
         return cls.declaredMethods.firstOrNull { m ->
             Modifier.isStatic(m.modifiers) &&
@@ -85,17 +96,10 @@ internal object ComposeSceneRenderer {
         } ?: fail("no ${paramCount}-arg CanvasLayersComposeScene factory on $FACTORY_CLASS")
     }
 
-    // PlatformContext.Empty is a stateless `class` (not a Kotlin `object`) with a public no-arg
-    // constructor in both 1.11 and 1.12, so instantiate it rather than reading an INSTANCE field.
-    private fun platformContextEmpty(): Any {
-        val cls = classOrNull(PLATFORM_CONTEXT_EMPTY) ?: fail("$PLATFORM_CONTEXT_EMPTY not found")
-        return cls.getDeclaredConstructor().newInstance()
-    }
-
-    /** Public method (incl. inherited) by simple name + arity, skipping Kotlin `$default` bridges. */
-    private fun method(target: Any, name: String, arity: Int): Method =
-        target.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == arity }
-            ?: fail("no $name/$arity on ${target.javaClass.name}")
+    /** A public method declared on the ComposeScene interface, by name + arity. */
+    private fun sceneMethod(name: String, arity: Int): Method =
+        composeSceneClass.methods.firstOrNull { it.name == name && it.parameterCount == arity }
+            ?: fail("no $name/$arity on $COMPOSE_SCENE")
 
     // invoke/newInstance wrap exceptions thrown by the target in InvocationTargetException; unwrap so
     // Compose's own exceptions (e.g. IllegalArgumentException for a negative density) propagate with
@@ -114,20 +118,8 @@ internal object ComposeSceneRenderer {
             throw e.targetException
         }
 
-    /** setContent is (content) on <= 1.11 and (compositionContext, content) on >= 1.12. */
-    private fun setContent(scene: Any, content: @Composable () -> Unit) {
-        val m = scene.javaClass.methods.firstOrNull {
-            it.name == "setContent" && it.parameterCount in 1..2
-        } ?: fail("no setContent on ${scene.javaClass.name}")
-        if (m.parameterCount == 1) {
-            m.call(scene, content)
-        } else {
-            m.call(scene, null, content) // CompositionContext defaults to null
-        }
-    }
-
     private fun close(target: Any) {
-        (target as? AutoCloseable)?.close() ?: method(target, "close", 0).call(target)
+        (target as? AutoCloseable)?.close() ?: fail("expected AutoCloseable, got ${target.javaClass.name}")
     }
 
     private sealed interface SceneDriver {
@@ -136,48 +128,54 @@ internal object ComposeSceneRenderer {
 
     /** CMP <= 1.11: factory(density, layoutDir, size, coroutineContext, platformContext, invalidate); render(canvas, nanoTime). */
     private object LegacyDriver : SceneDriver {
+        private val sceneFactory by lazy { findFactory(paramCount = 6) }
+        private val sceneSetContent by lazy { sceneMethod("setContent", 1) }
+        private val sceneRender by lazy { sceneMethod("render", 2) }
+
         override fun render(density: Density, size: IntSize, composeCanvas: Any, content: @Composable () -> Unit) {
-            val scene = factory(paramCount = 6).call(
-                null,
-                density,
-                LayoutDirection.Ltr,
-                size,
-                Dispatchers.Unconfined,
-                platformContextEmpty(),
-                NO_OP,
+            val scene = sceneFactory.call(
+                null, density, LayoutDirection.Ltr, size, Dispatchers.Unconfined, platformContext, NO_OP,
             ) ?: fail("CanvasLayersComposeScene factory returned null")
             try {
-                setContent(scene, content)
-                method(scene, "render", 2).call(scene, composeCanvas, 0L)
+                sceneSetContent.call(scene, content)
+                sceneRender.call(scene, composeCanvas, 0L)
             } finally {
                 close(scene)
             }
         }
     }
 
-    /** CMP >= 1.12: FrameRecomposer(ctx, onError); factory(recomposer, density, layoutDir, size, platformContext, x, y); performFrame -> measureAndLayout -> draw(canvas). */
+    /**
+     * CMP >= 1.12: a host-owned FrameRecomposer(coroutineContext, onError) replaces the legacy
+     * coroutineContext/invalidate params, and the single render() call becomes explicit
+     * performFrame -> measureAndLayout -> draw(canvas). The factory's two trailing Function0 params
+     * (invalidate + a callback) are no-ops for one-shot offscreen rendering.
+     */
     private object NextDriver : SceneDriver {
+        private val recomposerCtor by lazy {
+            val cls = classOrNull(FRAME_RECOMPOSER) ?: fail("$FRAME_RECOMPOSER not found")
+            cls.constructors.firstOrNull { it.parameterCount == 2 } ?: fail("no 2-arg FrameRecomposer constructor")
+        }
+        private val recomposerPerformFrame by lazy {
+            recomposerCtor.declaringClass.methods.firstOrNull { it.name == "performFrame" && it.parameterCount == 1 }
+                ?: fail("no performFrame/1 on $FRAME_RECOMPOSER")
+        }
+        private val sceneFactory by lazy { findFactory(paramCount = 7) }
+        private val sceneSetContent by lazy { sceneMethod("setContent", 2) }
+        private val sceneMeasureAndLayout by lazy { sceneMethod("measureAndLayout", 0) }
+        private val sceneDraw by lazy { sceneMethod("draw", 1) }
+
         override fun render(density: Density, size: IntSize, composeCanvas: Any, content: @Composable () -> Unit) {
-            val frClass = classOrNull(FRAME_RECOMPOSER) ?: fail("$FRAME_RECOMPOSER not found")
-            val frameRecomposer = (frClass.constructors.firstOrNull { it.parameterCount == 2 }
-                ?: fail("no 2-arg FrameRecomposer constructor"))
-                .make(Dispatchers.Unconfined, NO_OP)
+            val frameRecomposer = recomposerCtor.make(Dispatchers.Unconfined, NO_OP)
             try {
-                val scene = factory(paramCount = 7).call(
-                    null,
-                    frameRecomposer,
-                    density,
-                    LayoutDirection.Ltr,
-                    size,
-                    platformContextEmpty(),
-                    NO_OP,
-                    NO_OP,
+                val scene = sceneFactory.call(
+                    null, frameRecomposer, density, LayoutDirection.Ltr, size, platformContext, NO_OP, NO_OP,
                 ) ?: fail("CanvasLayersComposeScene factory returned null")
                 try {
-                    setContent(scene, content)
-                    method(frameRecomposer, "performFrame", 1).call(frameRecomposer, 0L)
-                    method(scene, "measureAndLayout", 0).call(scene)
-                    method(scene, "draw", 1).call(scene, composeCanvas)
+                    sceneSetContent.call(scene, null, content) // CompositionContext defaults to null
+                    recomposerPerformFrame.call(frameRecomposer, 0L)
+                    sceneMeasureAndLayout.call(scene)
+                    sceneDraw.call(scene, composeCanvas)
                 } finally {
                     close(scene)
                 }

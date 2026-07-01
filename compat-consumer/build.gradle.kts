@@ -6,7 +6,8 @@ plugins {
 }
 
 val composeVersion = providers.gradleProperty("composeVersion").orElse("1.11.1").get()
-val compose2pdfVersion = providers.gradleProperty("compose2pdfVersion").orElse("1.1.4-SNAPSHOT").get()
+val compose2pdfVersion = providers.gradleProperty("compose2pdfVersion").orNull
+    ?: error("compat-consumer requires -Pcompose2pdfVersion=<published version> (e.g. the value of `version` in the root gradle.properties)")
 val skikoVersion = providers.gradleProperty("skikoVersion").orNull // fallback override; normally unset
 
 kotlin {
