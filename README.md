@@ -49,11 +49,15 @@ Requires **JDK 17+** and **Compose Desktop** (Compose Multiplatform 1.9+).
 
 Tested weekly against the 3 most recent Compose Multiplatform releases:
 
+<!-- BEGIN cmp-matrix -->
 | Compose Multiplatform | Kotlin | Status |
 |:----------------------|:-------|:-------|
-| 1.11.0-alpha04 | 2.3.20 | CI tested |
-| **1.10.3** | 2.3.20 | CI tested (current) |
-| 1.9.3 | 2.3.20 | CI tested |
+| 1.12.0-beta01 | 2.4.0 | CI tested |
+| 1.11.1 | 2.4.0 | CI tested |
+| **1.10.3** | 2.4.0 | CI tested (current) |
+<!-- END cmp-matrix -->
+
+<sub>Generated from [`.github/compose-versions.json`](.github/compose-versions.json) by the update-compose-versions workflow — edit the JSON, not this table.</sub>
 
 **Platform support:**
 
