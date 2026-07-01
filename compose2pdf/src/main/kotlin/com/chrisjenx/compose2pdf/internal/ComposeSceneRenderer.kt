@@ -56,6 +56,10 @@ internal object ComposeSceneRenderer {
     private const val FRAME_RECOMPOSER = "androidx.compose.ui.platform.FrameRecomposer"
     private const val PLATFORM_CONTEXT_EMPTY = "androidx.compose.ui.platform.PlatformContext\$Empty"
 
+    // Parameter types used to disambiguate reflective method lookups (see [reflectMethod]).
+    private const val COMPOSE_CANVAS = "androidx.compose.ui.graphics.Canvas"
+    private const val FUNCTION2 = "kotlin.jvm.functions.Function2"
+
     private val NO_OP: () -> Unit = {}
 
     private val composeSceneClass: Class<*> by lazy {
@@ -96,10 +100,16 @@ internal object ComposeSceneRenderer {
         } ?: fail("no ${paramCount}-arg CanvasLayersComposeScene factory on $FACTORY_CLASS")
     }
 
-    /** A public method declared on the ComposeScene interface, by name + arity. */
-    private fun sceneMethod(name: String, arity: Int): Method =
-        composeSceneClass.methods.firstOrNull { it.name == name && it.parameterCount == arity }
-            ?: fail("no $name/$arity on $COMPOSE_SCENE")
+    /**
+     * A public method on [owner] matched by name AND parameter types (each given as a fully-qualified
+     * class name, or "*" to accept any single param) — not just arity, so a future same-arity overload
+     * (e.g. a `draw(Long)` added alongside `draw(Canvas)`) can't silently bind to the wrong member.
+     */
+    private fun reflectMethod(owner: Class<*>, name: String, vararg paramTypes: String): Method =
+        owner.methods.firstOrNull { m ->
+            m.name == name && m.parameterCount == paramTypes.size &&
+                m.parameterTypes.withIndex().all { (i, p) -> paramTypes[i] == "*" || p.name == paramTypes[i] }
+        } ?: fail("no $name(${paramTypes.joinToString()}) on ${owner.name}")
 
     // invoke/newInstance wrap exceptions thrown by the target in InvocationTargetException; unwrap so
     // Compose's own exceptions (e.g. IllegalArgumentException for a negative density) propagate with
@@ -129,8 +139,8 @@ internal object ComposeSceneRenderer {
     /** CMP <= 1.11: factory(density, layoutDir, size, coroutineContext, platformContext, invalidate); render(canvas, nanoTime). */
     private object LegacyDriver : SceneDriver {
         private val sceneFactory by lazy { findFactory(paramCount = 6) }
-        private val sceneSetContent by lazy { sceneMethod("setContent", 1) }
-        private val sceneRender by lazy { sceneMethod("render", 2) }
+        private val sceneSetContent by lazy { reflectMethod(composeSceneClass, "setContent", FUNCTION2) }
+        private val sceneRender by lazy { reflectMethod(composeSceneClass, "render", COMPOSE_CANVAS, "long") }
 
         override fun render(density: Density, size: IntSize, composeCanvas: Any, content: @Composable () -> Unit) {
             val scene = sceneFactory.call(
@@ -156,14 +166,12 @@ internal object ComposeSceneRenderer {
             val cls = classOrNull(FRAME_RECOMPOSER) ?: fail("$FRAME_RECOMPOSER not found")
             cls.constructors.firstOrNull { it.parameterCount == 2 } ?: fail("no 2-arg FrameRecomposer constructor")
         }
-        private val recomposerPerformFrame by lazy {
-            recomposerCtor.declaringClass.methods.firstOrNull { it.name == "performFrame" && it.parameterCount == 1 }
-                ?: fail("no performFrame/1 on $FRAME_RECOMPOSER")
-        }
+        private val recomposerPerformFrame by lazy { reflectMethod(recomposerCtor.declaringClass, "performFrame", "long") }
         private val sceneFactory by lazy { findFactory(paramCount = 7) }
-        private val sceneSetContent by lazy { sceneMethod("setContent", 2) }
-        private val sceneMeasureAndLayout by lazy { sceneMethod("measureAndLayout", 0) }
-        private val sceneDraw by lazy { sceneMethod("draw", 1) }
+        // (compositionContext, content): pin the content param to Function2; the leading arg is optional.
+        private val sceneSetContent by lazy { reflectMethod(composeSceneClass, "setContent", "*", FUNCTION2) }
+        private val sceneMeasureAndLayout by lazy { reflectMethod(composeSceneClass, "measureAndLayout") }
+        private val sceneDraw by lazy { reflectMethod(composeSceneClass, "draw", COMPOSE_CANVAS) }
 
         override fun render(density: Density, size: IntSize, composeCanvas: Any, content: @Composable () -> Unit) {
             val frameRecomposer = recomposerCtor.make(Dispatchers.Unconfined, NO_OP)

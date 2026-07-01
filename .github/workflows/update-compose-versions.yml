@@ -105,6 +105,10 @@ jobs:
           # so we always ship against the currently-released CMP. The docs-regeneration
           # step below picks up the new pin.
           BASE_COMPOSE=$(echo "$LATEST_STABLE" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          if [ -z "$BASE_COMPOSE" ]; then
+            echo "ERROR: no stable Compose version detected for the build base"
+            exit 1
+          fi
           echo "Build base -> Compose $BASE_COMPOSE + Kotlin $LATEST_KOTLIN"
           perl -i -pe "s/^compose-multiplatform = .*/compose-multiplatform = \"$BASE_COMPOSE\"/" gradle/libs.versions.toml
           perl -i -pe "s/^kotlin = .*/kotlin = \"$LATEST_KOTLIN\"/" gradle/libs.versions.toml
