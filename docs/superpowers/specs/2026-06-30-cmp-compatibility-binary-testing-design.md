@@ -53,8 +53,12 @@ it runs on each supported runtime by resolving it the way a downstream project w
 Bump `gradle/libs.versions.toml`:
 
 - `compose-multiplatform`: `1.10.3` → `1.11.1` (latest stable)
-- `kotlin`: `2.3.20` → `2.3.21` (latest known-good 2.3.x for CMP 1.11.x;
-  2.4.0 held back until the matrix confirms it)
+- `kotlin`: `2.3.20` → `2.4.0` (latest stable; the matrix already exercised
+  `1.11.1` + `2.4.0` at the library layer, so it is validated for the base. The
+  base bump also runs `:fidelity-test:test` locally to confirm 2.4.0 is fine for
+  the fidelity module; fall back to `2.3.21` only if that surfaces a regression.)
+- `1.11.1` (minor 11 < 12) keeps selecting the **cmpLegacy** scene driver, so the
+  published jar targets the ≤1.11 internal scene API.
 
 Main CI already builds+tests this pinned combo, covering "base runs on base."
 
@@ -70,12 +74,30 @@ different Compose plugin version without disturbing the library build).
 - `build.gradle.kts`: depends on `com.chrisjenx:compose2pdf:<version>` resolved
   from **`mavenLocal()`** (the jar built against 1.11.1). The version is passed
   as `-Pcompose2pdfVersion` (sourced from the root `gradle.properties`, currently
-  `1.1.2-SNAPSHOT`).
-- One smoke test: call `renderToPdf { /* a trivial composable, e.g. Text */ }`,
-  assert the returned bytes are non-empty and begin with the `%PDF` magic header.
-  This exercises the published binary being *called from code compiled by the
-  target version's Compose compiler* against the target runtime — the real
-  downstream scenario, including Skiko rendering.
+  `1.1.4-SNAPSHOT`).
+- A smoke check as an `application` `main()` (no test-framework wiring): call
+  `renderToPdf { Text(...) }`, assert the returned bytes are non-empty and begin
+  with the `%PDF-` magic header (`check(...)` → non-zero exit on failure). This
+  exercises the published binary being *called from code compiled by the target
+  version's Compose compiler* against the target runtime — the real downstream
+  scenario, including Skiko rendering.
+
+**Why a force is still needed.** compose2pdf's POM declares Compose `1.11.1` (its
+build base) as a transitive dependency. A consumer that merely applied an *older*
+Compose plugin would have that transitive `1.11.1` **win** conflict resolution —
+the smoke check would silently run on 1.11.1, not the target. The consumer
+therefore forces the whole `org.jetbrains.compose*` group to the target version
+via `resolutionStrategy.eachDependency`. **Skiko cascades correctly with no
+per-row bookkeeping**: once a Compose module is forced to version X, Gradle
+resolves *that* module's POM, which declares X's Skiko — the base version's Skiko
+edge leaves the graph. Forcing an exact target also models the strongest form of
+the guarantee: "does the one binary run on *exactly* this Compose version." A
+`skikoVersion` property is the documented fallback if any version fails to cascade.
+
+Dependency-direction note: because compose2pdf itself requires Compose 1.11.1, a
+real downstream on an *older* version only reaches that runtime by force-pinning
+Compose below our floor; the realistic, higher-value cell is the *forward* one
+(1.12.0-beta01), which — see §3 — is expected to fail against a cmpLegacy jar.
 
 ### 3. Rewritten `compatibility.yml`
 
@@ -84,37 +106,38 @@ so both OSes matter). Per cell:
 
 1. `./gradlew :compose2pdf:publishToMavenLocal` — builds the one artifact against
    pinned 1.11.1.
-2. Run the consumer against the cell's target:
-   `./gradlew -p compat-consumer test -PcomposeVersion=<v> -PkotlinVersion=<k> -Pcompose2pdfVersion=<lib>`
+2. Resolve the published version from `gradle.properties`.
+3. Run the consumer against the cell's target:
+   `./gradlew -p compat-consumer run -PcomposeVersion=<v> -PkotlinVersion=<k> -Pcompose2pdfVersion=<lib>`
    (using the root Gradle wrapper; distribution is independent of the target
    build's `settings.gradle.kts`).
+
+**Pre-release cells are non-blocking:**
+`continue-on-error: ${{ contains(matrix.version.compose-version, '-') }}` — a
+version string containing `-` (e.g. `1.12.0-beta01`) is a pre-release and is
+informational, so the cmpLegacy→cmpNext boundary does not paint the badge red.
+Stable cells gate the workflow.
 
 Keep `xvfb-run` on Linux. **Delete** the `perl` "Override versions" step.
 
 ### 4. `compose-versions.json` + auto-update
 
-Refresh the matrix to the current support window:
+The matrix version set is **already** the current support window —
+`{1.10.3, 1.11.1, 1.12.0-beta01}`, all at Kotlin `2.4.0` (previous stable /
+current stable / upcoming beta). **No JSON edit is required**; the per-row
+Kotlin now configures the *consumer* build for that version, and `2.4.0`
+currently works for every row (validated in §2's local run). Per-row Kotlin
+*pinning* (older minors → older Kotlin) is **deferred** — introduce it only if a
+row's smoke check fails on `2.4.0`.
 
-```json
-{ "versions": [
-  { "compose-version": "1.10.3",        "kotlin-version": "<compatible>" },
-  { "compose-version": "1.11.1",        "kotlin-version": "<compatible>" },
-  { "compose-version": "1.12.0-beta01", "kotlin-version": "<compatible>" }
-] }
-```
-
-(previous stable / current stable / upcoming beta — what the existing
-auto-update selection logic produces today; 1.9.3 dropped.)
-
-`update-compose-versions.yml` changes:
-
-- **Also bump the build base**: in the weekly PR, set
-  `gradle/libs.versions.toml`'s `compose-multiplatform` (and `kotlin`) to the
-  latest stable, in addition to refreshing `compose-versions.json`. Keeps "ship
-  against currently released" automatic; the human reviews/merges each bump.
-- **Pair each matrix row with a compatible Kotlin** rather than stamping every
-  row with the single latest stable Kotlin (older CMP minors need older Kotlin).
-  The per-row Kotlin now configures the *consumer* build for that version.
+`update-compose-versions.yml` change — **also bump the build base**: after
+rewriting `compose-versions.json`, the weekly job sets
+`gradle/libs.versions.toml`'s `compose-multiplatform` to the highest *stable*
+detected version and `kotlin` to the latest stable Kotlin, then runs
+`render-compat-tables.py` so the PR carries the regenerated docs. The PR-gate
+condition widens to fire when **either** `compose-versions.json` **or**
+`gradle/libs.versions.toml` changed. Keeps "ship against currently released"
+automatic; the human reviews/merges each bump.
 
 ## What each layer proves
 
@@ -130,18 +153,20 @@ current build base — the signal to drop it from the window (or change the base
 
 ## Non-goals / YAGNI
 
-- No fidelity/raster comparison in the consumer — a `%PDF` + non-empty assertion
+- No fidelity/raster comparison in the consumer — a `%PDF-` + non-empty assertion
   is enough to prove the binary loads and renders against the target runtime.
 - No new module inside the root build; the consumer stays a separate build.
-- Exact per-row Kotlin pairings are refined by what the matrix actually passes;
-  the design fixes the mechanism, not a frozen version table.
+- No `compose-versions.json` change — the matrix set is already correct.
+- No per-row Kotlin pinning yet — deferred until a row fails on 2.4.0.
 
 ## Files touched
 
-- `gradle/libs.versions.toml` — bump base CMP + Kotlin.
-- `.github/compose-versions.json` — refresh matrix.
+- `gradle/libs.versions.toml` — bump base CMP (1.11.1) + Kotlin (2.4.0).
+- `docs/compatibility.md`, `README.md` — regenerated by `render-compat-tables.py`.
 - `.github/workflows/compatibility.yml` — consumer-based flow; drop recompile.
-- `.github/workflows/update-compose-versions.yml` — bump base + per-row Kotlin.
-- `compat-consumer/settings.gradle.kts` — new; version-parameterized plugins.
-- `compat-consumer/build.gradle.kts` — new; mavenLocal dep + smoke test wiring.
-- `compat-consumer/src/test/.../SmokeTest.kt` — new; `renderToPdf` `%PDF` assertion.
+- `.github/workflows/update-compose-versions.yml` — also bump the build base + regen docs.
+- `compat-consumer/settings.gradle.kts` — new; version-parameterized plugins + mavenLocal.
+- `compat-consumer/build.gradle.kts` — new; mavenLocal dep + `resolutionStrategy` force + `application`.
+- `compat-consumer/gradle.properties` — new; JVM args + default property values.
+- `compat-consumer/src/main/kotlin/com/chrisjenx/compat/Smoke.kt` — new; `main()` `%PDF-` check.
+- `.gitignore` — ensure `compat-consumer/build/` is ignored (if not already covered).
