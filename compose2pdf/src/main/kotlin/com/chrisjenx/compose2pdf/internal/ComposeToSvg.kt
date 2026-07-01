@@ -1,18 +1,12 @@
-@file:OptIn(InternalComposeUiApi::class)
-
 package com.chrisjenx.compose2pdf.internal
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asComposeCanvas
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.scene.CanvasLayersComposeScene
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntSize
-import kotlinx.coroutines.Dispatchers
 import org.jetbrains.skia.OutputWStream
+import org.jetbrains.skia.Picture
 import org.jetbrains.skia.PictureRecorder
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.svg.SVGCanvas
@@ -21,6 +15,12 @@ import java.io.ByteArrayOutputStream
 /**
  * Shared utility for rendering Compose content to SVG via Skia's SVGCanvas.
  * Used by both PdfRenderer (SVG → PDF) and HtmlRenderer (SVG → HTML).
+ *
+ * The version-specific Compose scene drive (composition → layout → draw onto a Skia canvas) is
+ * delegated to [ComposeSceneRenderer]. That seam has two implementations selected by the build:
+ * `src/cmpLegacy` for Compose Multiplatform ≤ 1.11 and `src/cmpNext` for CMP ≥ 1.12. It exists
+ * because the `@InternalComposeUiApi` `CanvasLayersComposeScene` API the renderer relies on changed
+ * shape in CMP 1.12 (see each variant for details). Everything else here is version-agnostic.
  */
 internal object ComposeToSvg {
 
@@ -40,22 +40,7 @@ internal object ComposeToSvg {
         content: @Composable () -> Unit,
     ): String {
         // Step 1: Record Compose draw commands via PictureRecorder
-        val recorder = PictureRecorder()
-        val recordCanvas = recorder.beginRecording(
-            Rect.makeWH(widthPx.toFloat(), heightPx.toFloat())
-        )
-
-        val scene = CanvasLayersComposeScene(
-            density = density,
-            size = IntSize(widthPx, heightPx),
-            coroutineContext = Dispatchers.Unconfined,
-            invalidate = {},
-        )
-        scene.setContent(content)
-        scene.render(recordCanvas.asComposeCanvas(), nanoTime = 0)
-        scene.close()
-
-        val picture = recorder.finishRecordingAsPicture()
+        val picture = recordScene(widthPx, heightPx, density, content)
 
         // Step 2: Replay onto SVGCanvas to get vector SVG
         val baos = ByteArrayOutputStream()
@@ -131,26 +116,33 @@ internal object ComposeToSvg {
         content: @Composable () -> Unit,
     ): Int {
         var measuredHeight = 0
-        val recorder = PictureRecorder()
-        val recordCanvas = recorder.beginRecording(
-            Rect.makeWH(widthPx.toFloat(), maxHeightPx.toFloat())
-        )
-        val scene = CanvasLayersComposeScene(
-            density = density,
-            size = IntSize(widthPx, maxHeightPx),
-            coroutineContext = Dispatchers.Unconfined,
-            invalidate = {},
-        )
-        scene.setContent {
+        // Record only to drive composition + layout; the resulting picture is discarded (no SVG).
+        recordScene(widthPx, maxHeightPx, density) {
             Box(Modifier.onGloballyPositioned { coords ->
                 measuredHeight = coords.size.height
             }) {
                 content()
             }
-        }
-        scene.render(recordCanvas.asComposeCanvas(), nanoTime = 0)
-        scene.close()
-        recorder.finishRecordingAsPicture().close()
+        }.close()
         return measuredHeight
+    }
+
+    /**
+     * Records [content] into a Skia [Picture] at the given size/density, driving composition, layout,
+     * and draw via the version-specific [ComposeSceneRenderer]. Shared by [render] (which replays the
+     * picture onto an SVGCanvas) and [measureContentHeight] (which discards it after measurement).
+     */
+    private fun recordScene(
+        widthPx: Int,
+        heightPx: Int,
+        density: Density,
+        content: @Composable () -> Unit,
+    ): Picture {
+        val recorder = PictureRecorder()
+        val recordCanvas = recorder.beginRecording(
+            Rect.makeWH(widthPx.toFloat(), heightPx.toFloat())
+        )
+        ComposeSceneRenderer.drawContent(recordCanvas, widthPx, heightPx, density, content)
+        return recorder.finishRecordingAsPicture()
     }
 }

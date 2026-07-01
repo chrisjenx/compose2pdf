@@ -9,6 +9,15 @@ permissions:
   contents: read
 
 jobs:
+  docs-sync:
+    # Fails the PR if docs/compatibility.md or README.md have drifted from
+    # .github/compose-versions.json (hand-edit, or a compose-multiplatform pin bump).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compatibility tables match compose-versions.json
+        run: python3 .github/scripts/render-compat-tables.py --check
+
   build:
     strategy:
       matrix:

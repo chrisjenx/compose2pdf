@@ -13,14 +13,16 @@ compose2pdf is tested weekly against the 3 most recent Compose Multiplatform rel
 
 ## Compose Multiplatform versions
 
+<!-- BEGIN cmp-matrix -->
 | Compose Multiplatform | Kotlin | Status |
 |:----------------------|:-------|:-------|
-| 1.11.0-alpha04 | 2.3.20 | CI tested |
+| 1.12.0-beta01 | 2.4.0 | CI tested |
+| 1.11.1 | 2.4.0 | CI tested |
 | **1.10.3** | 2.3.20 | CI tested (current) |
-| 1.9.3 | 2.3.20 | CI tested |
+<!-- END cmp-matrix -->
 
 {: .note }
-This table is auto-updated weekly by CI. The compatibility workflow discovers the 3 most recent CMP releases and runs the full test suite against each.
+This table is generated from [`.github/compose-versions.json`](https://github.com/chrisjenx/compose2pdf/blob/main/.github/compose-versions.json) and updated weekly by the [update-compose-versions workflow](https://github.com/chrisjenx/compose2pdf/actions/workflows/update-compose-versions.yml), which discovers the 3 most recent CMP releases and runs the full test suite against each. The **current** row is the version the library itself pins. Edit `compose-versions.json`, not this table.
 
 ---
 

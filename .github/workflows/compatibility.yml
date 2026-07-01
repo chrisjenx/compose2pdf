@@ -49,4 +49,6 @@ jobs:
           echo "Testing CMP ${{ matrix.version.compose-version }} + Kotlin ${{ matrix.version.kotlin-version }}"
 
       - name: Build and test
-        run: ./gradlew :compose2pdf:build
+        # Also compile the fidelity-test sources (compile-only, no display needed) so a CMP-version
+        # break in the test suite's own scene driver fails the matrix instead of hiding until a real bump.
+        run: ./gradlew :compose2pdf:build :fidelity-test:compileTestKotlin

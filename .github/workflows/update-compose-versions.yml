@@ -110,6 +110,13 @@ jobs:
             echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Regenerate compatibility tables in docs + README
+        if: steps.detect.outputs.changed == 'true'
+        # Never let a docs-regeneration hiccup block the version-bump PR; CI's docs-sync
+        # check (ci.yml) is the gate that surfaces a stale/broken table on the PR.
+        continue-on-error: true
+        run: python3 .github/scripts/render-compat-tables.py
+
       - name: Create Pull Request
         if: steps.detect.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
@@ -123,6 +130,8 @@ jobs:
             ```json
             ${{ steps.detect.outputs.matrix }}
             ```
+
+            The compatibility tables in `docs/compatibility.md` and `README.md` have been regenerated from the matrix.
 
             The compatibility CI will run on this PR to verify all versions build and pass tests.
             If a version fails, adjust its `kotlin-version` in `.github/compose-versions.json` before merging.

@@ -5,12 +5,8 @@ package com.chrisjenx.compose2pdf.test
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
-import androidx.compose.ui.graphics.asComposeCanvas
-import androidx.compose.ui.scene.CanvasLayersComposeScene
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntSize
 import com.chrisjenx.compose2pdf.PdfPageConfig
-import kotlinx.coroutines.Dispatchers
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.rendering.PDFRenderer
@@ -104,15 +100,9 @@ internal fun renderComposeToSvg(
     val recordCanvas = recorder.beginRecording(
         SkiaRect.makeWH(widthPx.toFloat(), heightPx.toFloat())
     )
-    val scene = CanvasLayersComposeScene(
-        density = density,
-        size = IntSize(widthPx, heightPx),
-        coroutineContext = Dispatchers.Unconfined,
-        invalidate = {},
-    )
-    scene.setContent(content)
-    scene.render(recordCanvas.asComposeCanvas(), nanoTime = 0)
-    scene.close()
+    // Version-specific scene drive (see cmpLegacy/cmpNext source variants) — mirrors the
+    // production compose2pdf ComposeSceneRenderer seam, which is internal and not visible here.
+    drawComposeSceneToCanvas(recordCanvas, widthPx, heightPx, density, content)
     val picture = recorder.finishRecordingAsPicture()
 
     val baos = ByteArrayOutputStream()
