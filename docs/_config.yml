@@ -39,6 +39,18 @@ callouts:
 
 nav_sort: case_insensitive
 
+# Never publish internal Superpowers plans/specs to the docs site.
+# NOTE: setting `exclude` replaces Jekyll's built-in defaults, so the
+# standard entries below are re-listed to keep Gemfile/vendor unpublished.
+exclude:
+  - superpowers/
+  - Gemfile
+  - Gemfile.lock
+  - vendor/
+  - .sass-cache/
+  - .jekyll-cache/
+  - node_modules/
+
 kramdown:
   syntax_highlighter_opts:
     block:
