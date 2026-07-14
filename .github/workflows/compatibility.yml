@@ -72,3 +72,55 @@ jobs:
           -PcomposeVersion=${{ matrix.version.compose-version }}
           -PkotlinVersion=${{ matrix.version.kotlin-version }}
           -Pcompose2pdfVersion=${{ steps.lib.outputs.version }}
+
+  # Blocking guard for the reflective NextDriver (CMP >=1.12 reshaped scene API).
+  # The rolling newest-prerelease cell in `test` is continue-on-error (it tolerates upstream
+  # prerelease churn), which leaves the >=1.12 reflective dispatch with no BLOCKING check.
+  # This job pins a FROZEN, already-verified reshaped release (1.12.0-beta01 - an immutable
+  # artifact that can't churn) and fails CI if our NextDriver reflection regresses. The weekly
+  # version-bump can't touch this pin (it's hardcoded here, not in compose-versions.json).
+  # Remove this job once a STABLE 1.12.x enters the matrix (its cell is blocking and covers this).
+  nextdriver-guard:
+    name: Reflective NextDriver guard (CMP 1.12.0-beta01)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Pin the frozen reshaped CMP (>=1.12)
+        run: .github/scripts/pin-compose-version.sh 1.12.0-beta01 2.4.0
+
+      - name: Unit tests on the reshaped scene API (exercises NextDriver)
+        # Recompiling here runs the SAME reflective ComposeSceneRenderer that ships (dispatch is
+        # runtime-based on the CMP present). With CMP 1.12.0-beta01 on the classpath FrameRecomposer
+        # exists, so NextDriver is selected and the render tests drive the reflective >=1.12 path.
+        # LegacyDriver cannot drive the reshaped API, so a green run proves NextDriver works; a
+        # broken path fails this BLOCKING job (no continue-on-error).
+        run: ./gradlew :compose2pdf:test --no-configuration-cache
+
+  # Single required status check for branch protection. Fails if any required job did not
+  # succeed, so the non-blocking prerelease matrix cell can never mask a real failure.
+  compat-gate:
+    name: Compose Compatibility CI Gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - load-versions
+      - test
+      - nextdriver-guard
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify all required jobs succeeded
+        run: >
+          .github/scripts/check-required-jobs.sh
+          "load-versions=${{ needs.load-versions.result }}"
+          "test=${{ needs.test.result }}"
+          "nextdriver-guard=${{ needs.nextdriver-guard.result }}"
