@@ -96,15 +96,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Pin the frozen reshaped CMP (>=1.12)
-        run: |
-          set -euo pipefail
-          perl -i -pe '
-            s/^kotlin = ".*"/kotlin = "2.4.0"/;
-            s/^compose-multiplatform = ".*"/compose-multiplatform = "1.12.0-beta01"/;
-          ' gradle/libs.versions.toml
-          grep -qE '^kotlin = "2.4.0"$' gradle/libs.versions.toml
-          grep -qE '^compose-multiplatform = "1.12.0-beta01"$' gradle/libs.versions.toml
-          grep -E '^(kotlin|compose-multiplatform) = ' gradle/libs.versions.toml
+        run: .github/scripts/pin-compose-version.sh 1.12.0-beta01 2.4.0
 
       - name: Unit tests on the reshaped scene API (exercises NextDriver)
         # Recompiling here runs the SAME reflective ComposeSceneRenderer that ships (dispatch is
@@ -125,15 +117,10 @@ jobs:
       - test
       - nextdriver-guard
     steps:
+      - uses: actions/checkout@v5
       - name: Verify all required jobs succeeded
-        run: |
-          echo "  load-versions:    ${{ needs.load-versions.result }}"
-          echo "  test:             ${{ needs.test.result }}"
-          echo "  nextdriver-guard: ${{ needs.nextdriver-guard.result }}"
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]] \
-             || [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]] \
-             || [[ "${{ contains(needs.*.result, 'skipped') }}" == "true" ]]; then
-            echo "::error::One or more required jobs did not succeed."
-            exit 1
-          fi
-          echo "All required jobs succeeded."
+        run: >
+          .github/scripts/check-required-jobs.sh
+          "load-versions=${{ needs.load-versions.result }}"
+          "test=${{ needs.test.result }}"
+          "nextdriver-guard=${{ needs.nextdriver-guard.result }}"
