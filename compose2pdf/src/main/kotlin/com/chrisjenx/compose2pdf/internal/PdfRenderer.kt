@@ -8,6 +8,7 @@ import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.ui.text.TextStyle
 import com.chrisjenx.compose2pdf.Compose2PdfException
@@ -16,6 +17,7 @@ import com.chrisjenx.compose2pdf.LocalPdfPageConfig
 import com.chrisjenx.compose2pdf.PdfLinkAnnotation
 import com.chrisjenx.compose2pdf.PdfLinkCollector
 import com.chrisjenx.compose2pdf.PdfPageConfig
+import com.chrisjenx.compose2pdf.PdfPageInfo
 import com.chrisjenx.compose2pdf.PdfPagination
 import com.chrisjenx.compose2pdf.RenderMode
 import org.apache.pdfbox.pdmodel.PDDocument
@@ -48,21 +50,238 @@ internal object PdfRenderer {
         mode: RenderMode,
         defaultFontFamily: FontFamily?,
         pagination: PdfPagination,
+        header: (@Composable (PdfPageInfo) -> Unit)? = null,
+        footer: (@Composable (PdfPageInfo) -> Unit)? = null,
         content: @Composable () -> Unit,
     ): PDDocument {
-        return when (pagination) {
-            PdfPagination.SINGLE_PAGE -> renderMultiPage(
-                pageCount = 1,
-                config = config,
-                density = density,
-                mode = mode,
-                defaultFontFamily = defaultFontFamily,
-                content = { content() },
-            )
-            PdfPagination.AUTO -> when (mode) {
-                RenderMode.VECTOR -> renderAutoVector(config, density, defaultFontFamily, content)
-                RenderMode.RASTER -> renderAutoRaster(config, density, defaultFontFamily, content)
+        if (header == null && footer == null) {
+            // Fast path: exactly the pre-slots pipeline (fidelity guarantee — see CLAUDE.md gotchas).
+            return when (pagination) {
+                PdfPagination.SINGLE_PAGE -> renderMultiPage(
+                    pageCount = 1,
+                    config = config,
+                    density = density,
+                    mode = mode,
+                    defaultFontFamily = defaultFontFamily,
+                    content = { content() },
+                )
+                PdfPagination.AUTO -> when (mode) {
+                    RenderMode.VECTOR -> renderAutoVector(config, density, defaultFontFamily, content)
+                    RenderMode.RASTER -> renderAutoRaster(config, density, defaultFontFamily, content)
+                }
             }
+        }
+        val bands = measureSlotBands(config, density, defaultFontFamily, header, footer)
+        return when (mode) {
+            RenderMode.VECTOR -> renderVectorWithSlots(config, density, defaultFontFamily, pagination, header, footer, bands, content)
+            RenderMode.RASTER -> renderRasterWithSlots(config, density, defaultFontFamily, pagination, header, footer, bands, content)
+        }
+    }
+
+    /** Measured header/footer bands plus the page config with margins inflated by them. */
+    internal class SlotBands(
+        val headerPx: Int,
+        val footerPx: Int,
+        val headerPt: Float,
+        val footerPt: Float,
+        val effectiveConfig: PdfPageConfig,
+    )
+
+    /**
+     * Measures slot heights (px-first; pt derived from px) and builds the effective config.
+     * The effective config is provided through LocalPdfPageConfig so the public
+     * PaginatedColumn breaks at the reduced content height.
+     */
+    internal fun measureSlotBands(
+        config: PdfPageConfig,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        header: (@Composable (PdfPageInfo) -> Unit)?,
+        footer: (@Composable (PdfPageInfo) -> Unit)?,
+    ): SlotBands {
+        val contentWidthPx = config.contentWidthPx(density)
+        val contentHeightPx = config.contentHeightPx(density)
+        val headerPx = measureSlotHeight(header, contentWidthPx, contentHeightPx, density, defaultFontFamily, config)
+        val footerPx = measureSlotHeight(footer, contentWidthPx, contentHeightPx, density, defaultFontFamily, config)
+        require(headerPx + footerPx < contentHeightPx) {
+            "Header (${headerPx}px) and footer (${footerPx}px) leave no room for page content " +
+                "(content area is ${contentHeightPx}px tall at density ${density.density})"
+        }
+        val headerPt = headerPx / density.density
+        val footerPt = footerPx / density.density
+        val effectiveConfig = config.copy(
+            margins = config.margins.copy(
+                top = config.margins.top + headerPt.dp,
+                bottom = config.margins.bottom + footerPt.dp,
+            )
+        )
+        return SlotBands(headerPx, footerPx, headerPt, footerPt, effectiveConfig)
+    }
+
+    private fun measureSlotHeight(
+        slot: (@Composable (PdfPageInfo) -> Unit)?,
+        contentWidthPx: Int,
+        maxHeightPx: Int,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        config: PdfPageConfig,
+    ): Int {
+        if (slot == null) return 0
+        // pageCount = 2 sentinel: a footer guarded by `if (pageCount > 1)` must still
+        // measure its real height. Slot height must be stable across pages; content
+        // taller than the measured band is clipped at stamp time.
+        val sentinel = PdfPageInfo(pageIndex = 0, pageCount = 2)
+        return ComposeToSvg.measureContentHeight(contentWidthPx, maxHeightPx, density) {
+            WrapContent(defaultFontFamily, null, config) { slot(sentinel) }
+        }
+    }
+
+    /** PageLayout for the body area between the bands. Content height derives from px. */
+    private fun bodyLayout(config: PdfPageConfig, density: Density, bands: SlotBands): PageLayout {
+        val effectivePx = bands.effectiveConfig.contentHeightPx(density)
+        return PageLayout(
+            pageWidthPt = config.width.value,
+            pageHeightPt = config.height.value,
+            contentWidthPt = config.contentWidth.value,
+            contentHeightPt = effectivePx / density.density,
+            marginLeftPt = config.margins.left.value,
+            marginTopPt = config.margins.top.value + bands.headerPt,
+        )
+    }
+
+    /** PageLayout describing a slot band ([bandHeightPt] tall, [marginTopPt] from the page top). */
+    private fun slotLayout(config: PdfPageConfig, bandHeightPt: Float, marginTopPt: Float) = PageLayout(
+        pageWidthPt = config.width.value,
+        pageHeightPt = config.height.value,
+        contentWidthPt = config.contentWidth.value,
+        contentHeightPt = bandHeightPt,
+        marginLeftPt = config.margins.left.value,
+        marginTopPt = marginTopPt,
+    )
+
+    private fun renderRasterWithSlots(
+        config: PdfPageConfig,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        pagination: PdfPagination,
+        header: (@Composable (PdfPageInfo) -> Unit)?,
+        footer: (@Composable (PdfPageInfo) -> Unit)?,
+        bands: SlotBands,
+        content: @Composable () -> Unit,
+    ): PDDocument = throw Compose2PdfException("header/footer raster support lands in the next task")
+
+    private fun renderVectorWithSlots(
+        config: PdfPageConfig,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        pagination: PdfPagination,
+        header: (@Composable (PdfPageInfo) -> Unit)?,
+        footer: (@Composable (PdfPageInfo) -> Unit)?,
+        bands: SlotBands,
+        content: @Composable () -> Unit,
+    ): PDDocument {
+        val contentWidthPx = config.contentWidthPx(density)
+        val effectivePx = bands.effectiveConfig.contentHeightPx(density)
+        val layout = bodyLayout(config, density, bands)
+
+        val pdfDoc = PDDocument()
+        val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
+        val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
+        val bodyLinks = PdfLinkCollector()
+
+        val singlePage = pagination == PdfPagination.SINGLE_PAGE || run {
+            val measuredHeightPx = ComposeToSvg.measureContentHeight(contentWidthPx, MAX_MEASURE_HEIGHT_PX, density) {
+                WrapContent(defaultFontFamily, null, bands.effectiveConfig) {
+                    PaginatedColumn(contentHeightPx = effectivePx) { content() }
+                }
+            }
+            measuredHeightPx <= effectivePx || measuredHeightPx >= MAX_MEASURE_HEIGHT_PX
+        }
+
+        val pageCount: Int
+        if (singlePage) {
+            val svg = ComposeToSvg.render(contentWidthPx, effectivePx, density) {
+                WrapContent(defaultFontFamily, bodyLinks, bands.effectiveConfig) { content() }
+            }
+            SvgToPdfConverter.addPage(pdfDoc, svg, layout, density.density, fontCache, imageCache)
+            pageCount = 1
+        } else {
+            val result = ComposeToSvg.renderWithMeasurement(contentWidthPx, MAX_MEASURE_HEIGHT_PX, density) {
+                WrapContent(defaultFontFamily, bodyLinks, bands.effectiveConfig) {
+                    PaginatedColumn(contentHeightPx = effectivePx) { content() }
+                }
+            }
+            val totalContentHeightPt = result.measuredHeightPx.coerceAtLeast(1) / density.density
+            val estimatedPages = kotlin.math.ceil(totalContentHeightPt.toDouble() / layout.contentHeightPt).toInt()
+            if (estimatedPages > MAX_AUTO_PAGES) {
+                logger.warning(
+                    "Auto-pagination truncated: content requires ~$estimatedPages pages but max is $MAX_AUTO_PAGES"
+                )
+            }
+            pageCount = SvgToPdfConverter.addAutoPages(
+                pdfDoc, result.svg, layout, totalContentHeightPt,
+                density.density, MAX_AUTO_PAGES, fontCache, imageCache,
+            )
+        }
+
+        distributeLinks(pdfDoc, config, bodyLinks.links, layout.contentHeightPt, marginTopPt = layout.marginTopPt)
+        stampSlotsVector(pdfDoc, config, density, defaultFontFamily, header, footer, bands, pageCount, fontCache, imageCache)
+        return pdfDoc
+    }
+
+    private fun stampSlotsVector(
+        pdfDoc: PDDocument,
+        config: PdfPageConfig,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        header: (@Composable (PdfPageInfo) -> Unit)?,
+        footer: (@Composable (PdfPageInfo) -> Unit)?,
+        bands: SlotBands,
+        pageCount: Int,
+        fontCache: MutableMap<String, org.apache.pdfbox.pdmodel.font.PDFont>,
+        imageCache: MutableMap<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>,
+    ) {
+        val headerLayout = slotLayout(config, bands.headerPt, marginTopPt = config.margins.top.value)
+        // Footer anchors to the bottom margin so px->pt rounding slop lands in the body gap, not off-page.
+        val footerLayout = slotLayout(
+            config, bands.footerPt,
+            marginTopPt = config.height.value - config.margins.bottom.value - bands.footerPt,
+        )
+        for (pageIndex in 0 until pageCount) {
+            val info = PdfPageInfo(pageIndex, pageCount)
+            val page = pdfDoc.getPage(pageIndex)
+            if (header != null && bands.headerPx > 0) {
+                stampSlotVector(pdfDoc, page, config, density, defaultFontFamily, header, info, bands.headerPx, headerLayout, fontCache, imageCache)
+            }
+            if (footer != null && bands.footerPx > 0) {
+                stampSlotVector(pdfDoc, page, config, density, defaultFontFamily, footer, info, bands.footerPx, footerLayout, fontCache, imageCache)
+            }
+        }
+    }
+
+    private fun stampSlotVector(
+        pdfDoc: PDDocument,
+        page: PDPage,
+        config: PdfPageConfig,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        slot: @Composable (PdfPageInfo) -> Unit,
+        info: PdfPageInfo,
+        bandHeightPx: Int,
+        bandLayout: PageLayout,
+        fontCache: MutableMap<String, org.apache.pdfbox.pdmodel.font.PDFont>,
+        imageCache: MutableMap<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>,
+    ) {
+        val linkCollector = PdfLinkCollector()
+        val svg = ComposeToSvg.render(config.contentWidthPx(density), bandHeightPx, density) {
+            WrapContent(defaultFontFamily, linkCollector, config) { slot(info) }
+        }
+        SvgToPdfConverter.drawSvgOnPage(pdfDoc, page, svg, bandLayout, density.density, fontCache, imageCache)
+        for (link in linkCollector.links) {
+            addLinkToPage(
+                page, bandLayout.pageHeightPt, bandLayout.marginLeftPt, bandLayout.marginTopPt,
+                link.href, link.x, link.y, link.width, link.height,
+            )
         }
     }
 
@@ -346,7 +565,10 @@ internal object PdfRenderer {
     ) {
         if (links.isEmpty()) return
         for (link in links) {
-            addLinkToPage(page, config, link.href, link.x, link.y, link.width, link.height)
+            addLinkToPage(
+                page, config.height.value, config.margins.left.value, config.margins.top.value,
+                link.href, link.x, link.y, link.width, link.height,
+            )
         }
     }
 
@@ -355,19 +577,25 @@ internal object PdfRenderer {
         config: PdfPageConfig,
         links: List<PdfLinkAnnotation>,
         contentHeightPt: Float,
+        marginTopPt: Float = config.margins.top.value,
     ) {
         if (links.isEmpty()) return
         for (link in links) {
             val pageIndex = (link.y / contentHeightPt).toInt()
                 .coerceIn(0, doc.numberOfPages - 1)
             val adjustedY = link.y - pageIndex * contentHeightPt
-            addLinkToPage(doc.getPage(pageIndex), config, link.href, link.x, adjustedY, link.width, link.height)
+            addLinkToPage(
+                doc.getPage(pageIndex), config.height.value, config.margins.left.value, marginTopPt,
+                link.href, link.x, adjustedY, link.width, link.height,
+            )
         }
     }
 
     private fun addLinkToPage(
         page: PDPage,
-        config: PdfPageConfig,
+        pageHeightPt: Float,
+        marginLeftPt: Float,
+        marginTopPt: Float,
         href: String,
         x: Float,
         y: Float,
@@ -384,9 +612,9 @@ internal object PdfRenderer {
             svgY = y,
             width = width,
             height = height,
-            pageHeight = config.height.value,
-            marginLeft = config.margins.left.value,
-            marginTop = config.margins.top.value,
+            pageHeight = pageHeightPt,
+            marginLeft = marginLeftPt,
+            marginTop = marginTopPt,
         )
 
         val borderStyle = PDBorderStyleDictionary()

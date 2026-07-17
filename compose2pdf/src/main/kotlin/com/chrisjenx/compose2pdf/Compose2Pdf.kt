@@ -33,8 +33,16 @@ class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeE
  * @param mode Vector (SVG-based) or raster rendering. Defaults to VECTOR.
  * @param defaultFontFamily The default text font family. Defaults to [InterFontFamily] (bundled Inter).
  * @param pagination Controls page splitting. Defaults to [PdfPagination.AUTO].
+ * @param header Optional composable stamped at the top of every page, above the content
+ *   area. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
+ *   sentinel, so `if (pageCount > 1)` footers still reserve space) and that height is
+ *   reserved uniformly on every page — slot height must be stable across pages; taller
+ *   content is clipped to the band. Inside the body, [LocalPdfPageConfig] reflects the
+ *   content area reduced by the bands.
+ * @param footer Optional composable stamped at the bottom of every page. Same rules as [header].
  * @param content The composable content to render.
  * @throws Compose2PdfException if rendering fails.
+ * @throws IllegalArgumentException if the measured header + footer heights leave no room for content.
  *
  * **Thread safety**: This function is not thread-safe. Concurrent calls should be
  * serialized externally (e.g., via a mutex or single-threaded dispatcher).
@@ -46,10 +54,12 @@ fun renderToPdf(
     mode: RenderMode = RenderMode.VECTOR,
     defaultFontFamily: FontFamily? = InterFontFamily,
     pagination: PdfPagination = PdfPagination.AUTO,
+    header: (@Composable (PdfPageInfo) -> Unit)? = null,
+    footer: (@Composable (PdfPageInfo) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     try {
-        val doc = PdfRenderer.renderSinglePage(config, density, mode, defaultFontFamily, pagination, content)
+        val doc = PdfRenderer.renderSinglePage(config, density, mode, defaultFontFamily, pagination, header, footer, content)
         doc.use { it.save(outputStream) }
     } catch (e: Compose2PdfException) {
         throw e
@@ -80,9 +90,17 @@ fun renderToPdf(
  *   Pass null to use system fonts instead, or supply your own [FontFamily].
  * @param pagination Controls page splitting. [PdfPagination.AUTO] automatically paginates
  *   overflowing content. [PdfPagination.SINGLE_PAGE] clips to a single page.
+ * @param header Optional composable stamped at the top of every page, above the content
+ *   area. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
+ *   sentinel, so `if (pageCount > 1)` footers still reserve space) and that height is
+ *   reserved uniformly on every page — slot height must be stable across pages; taller
+ *   content is clipped to the band. Inside the body, [LocalPdfPageConfig] reflects the
+ *   content area reduced by the bands.
+ * @param footer Optional composable stamped at the bottom of every page. Same rules as [header].
  * @param content The composable content to render.
  * @return A valid PDF as a ByteArray.
  * @throws Compose2PdfException if rendering fails.
+ * @throws IllegalArgumentException if the measured header + footer heights leave no room for content.
  *
  * **Thread safety**: This function is not thread-safe. Concurrent calls should be
  * serialized externally (e.g., via a mutex or single-threaded dispatcher).
@@ -93,10 +111,12 @@ fun renderToPdf(
     mode: RenderMode = RenderMode.VECTOR,
     defaultFontFamily: FontFamily? = InterFontFamily,
     pagination: PdfPagination = PdfPagination.AUTO,
+    header: (@Composable (PdfPageInfo) -> Unit)? = null,
+    footer: (@Composable (PdfPageInfo) -> Unit)? = null,
     content: @Composable () -> Unit,
 ): ByteArray {
     val baos = ByteArrayOutputStream()
-    renderToPdf(baos, config, density, mode, defaultFontFamily, pagination, content)
+    renderToPdf(baos, config, density, mode, defaultFontFamily, pagination, header, footer, content)
     return baos.toByteArray()
 }
 
