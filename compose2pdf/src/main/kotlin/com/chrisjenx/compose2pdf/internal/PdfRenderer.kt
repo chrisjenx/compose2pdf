@@ -220,6 +220,46 @@ internal object PdfRenderer {
         return doc
     }
 
+    /**
+     * Shared per-page iteration for the with-slots stamping paths ([stampSlotsVector] and
+     * [stampSlotsRaster]): for each page, builds the real (non-sentinel) [PdfPageInfo] and
+     * invokes [stampBand] for the header then the footer, skipping either when absent or
+     * when its measured band is zero-height. The mode-specific drawing (raster bitmap vs.
+     * vector SVG) lives in [stampBand]. Does NOT touch the null-slot dispatch in
+     * [renderSinglePage] or the plain render paths — those stay untouched.
+     */
+    private fun stampSlotsOnEachPage(
+        doc: PDDocument,
+        config: PdfPageConfig,
+        bands: SlotBands,
+        pageCount: Int,
+        header: (@Composable (PdfPageInfo) -> Unit)?,
+        footer: (@Composable (PdfPageInfo) -> Unit)?,
+        stampBand: (
+            page: PDPage,
+            info: PdfPageInfo,
+            slot: @Composable (PdfPageInfo) -> Unit,
+            bandHeightPx: Int,
+            topPt: Float,
+            heightPt: Float,
+        ) -> Unit,
+    ) {
+        for (pageIndex in 0 until pageCount) {
+            val info = PdfPageInfo(pageIndex, pageCount)
+            val page = doc.getPage(pageIndex)
+            if (header != null && bands.headerPx > 0) {
+                stampBand(page, info, header, bands.headerPx, config.margins.top.value, bands.headerPt)
+            }
+            if (footer != null && bands.footerPx > 0) {
+                // Footer anchors to the bottom margin so px->pt rounding slop lands in the body gap, not off-page.
+                stampBand(
+                    page, info, footer, bands.footerPx,
+                    config.height.value - config.margins.bottom.value - bands.footerPt, bands.footerPt,
+                )
+            }
+        }
+    }
+
     private fun stampSlotsRaster(
         doc: PDDocument,
         config: PdfPageConfig,
@@ -230,25 +270,8 @@ internal object PdfRenderer {
         bands: SlotBands,
         pageCount: Int,
     ) {
-        for (pageIndex in 0 until pageCount) {
-            val info = PdfPageInfo(pageIndex, pageCount)
-            val page = doc.getPage(pageIndex)
-            if (header != null && bands.headerPx > 0) {
-                stampSlotRaster(
-                    doc, page, config, density, defaultFontFamily, header, info,
-                    bandHeightPx = bands.headerPx,
-                    topPt = config.margins.top.value,
-                    heightPt = bands.headerPt,
-                )
-            }
-            if (footer != null && bands.footerPx > 0) {
-                stampSlotRaster(
-                    doc, page, config, density, defaultFontFamily, footer, info,
-                    bandHeightPx = bands.footerPx,
-                    topPt = config.height.value - config.margins.bottom.value - bands.footerPt,
-                    heightPt = bands.footerPt,
-                )
-            }
+        stampSlotsOnEachPage(doc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt ->
+            stampSlotRaster(doc, page, config, density, defaultFontFamily, slot, info, bandHeightPx, topPt, heightPt)
         }
     }
 
@@ -360,21 +383,9 @@ internal object PdfRenderer {
         fontCache: MutableMap<String, org.apache.pdfbox.pdmodel.font.PDFont>,
         imageCache: MutableMap<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>,
     ) {
-        val headerLayout = slotLayout(config, bands.headerPt, marginTopPt = config.margins.top.value)
-        // Footer anchors to the bottom margin so px->pt rounding slop lands in the body gap, not off-page.
-        val footerLayout = slotLayout(
-            config, bands.footerPt,
-            marginTopPt = config.height.value - config.margins.bottom.value - bands.footerPt,
-        )
-        for (pageIndex in 0 until pageCount) {
-            val info = PdfPageInfo(pageIndex, pageCount)
-            val page = pdfDoc.getPage(pageIndex)
-            if (header != null && bands.headerPx > 0) {
-                stampSlotVector(pdfDoc, page, config, density, defaultFontFamily, header, info, bands.headerPx, headerLayout, fontCache, imageCache)
-            }
-            if (footer != null && bands.footerPx > 0) {
-                stampSlotVector(pdfDoc, page, config, density, defaultFontFamily, footer, info, bands.footerPx, footerLayout, fontCache, imageCache)
-            }
+        stampSlotsOnEachPage(pdfDoc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt ->
+            val bandLayout = slotLayout(config, bandHeightPt = heightPt, marginTopPt = topPt)
+            stampSlotVector(pdfDoc, page, config, density, defaultFontFamily, slot, info, bandHeightPx, bandLayout, fontCache, imageCache)
         }
     }
 
