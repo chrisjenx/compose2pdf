@@ -168,7 +168,126 @@ internal object PdfRenderer {
         footer: (@Composable (PdfPageInfo) -> Unit)?,
         bands: SlotBands,
         content: @Composable () -> Unit,
-    ): PDDocument = throw Compose2PdfException("header/footer raster support lands in the next task")
+    ): PDDocument {
+        val contentWidthPx = config.contentWidthPx(density)
+        val effectivePx = bands.effectiveConfig.contentHeightPx(density)
+        val bodyTopPt = config.margins.top.value + bands.headerPt
+        val bodyHeightPt = effectivePx / density.density
+        val bodyLinks = PdfLinkCollector()
+        val doc = PDDocument()
+
+        val measuredHeightPx = if (pagination == PdfPagination.SINGLE_PAGE) effectivePx else {
+            ComposeToSvg.measureContentHeight(contentWidthPx, MAX_MEASURE_HEIGHT_PX, density) {
+                WrapContent(defaultFontFamily, null, bands.effectiveConfig) {
+                    PaginatedColumn(contentHeightPx = effectivePx) { content() }
+                }
+            }
+        }
+
+        if (measuredHeightPx <= effectivePx || measuredHeightPx >= MAX_MEASURE_HEIGHT_PX) {
+            val bitmap = renderComposeToBitmap(contentWidthPx, effectivePx, density) {
+                WrapContent(defaultFontFamily, bodyLinks, bands.effectiveConfig) { content() }
+            }
+            addBitmapPage(doc, config, bitmap, topPt = bodyTopPt, heightPt = bodyHeightPt)
+        } else {
+            val fullBitmap = renderComposeToBitmap(contentWidthPx, measuredHeightPx, density) {
+                WrapContent(defaultFontFamily, bodyLinks, bands.effectiveConfig) {
+                    PaginatedColumn(contentHeightPx = effectivePx) { content() }
+                }
+            }
+            val rawPageCount = kotlin.math.ceil(measuredHeightPx.toFloat() / effectivePx.toFloat()).toInt()
+            if (rawPageCount > MAX_AUTO_PAGES) {
+                logger.warning(
+                    "Auto-pagination truncated: content requires ~$rawPageCount pages but max is $MAX_AUTO_PAGES"
+                )
+            }
+            val pageCount = rawPageCount.coerceIn(1, MAX_AUTO_PAGES)
+            for (pageIndex in 0 until pageCount) {
+                val sliceTop = pageIndex * effectivePx
+                val sliceHeight = minOf(effectivePx, measuredHeightPx - sliceTop)
+                if (sliceHeight <= 0) break
+                val slice = fullBitmap.getSubimage(0, sliceTop, contentWidthPx, sliceHeight)
+                addBitmapPage(
+                    doc, config, slice,
+                    topPt = bodyTopPt,
+                    heightPt = bodyHeightPt * sliceHeight / effectivePx,
+                )
+            }
+        }
+
+        distributeLinks(doc, config, bodyLinks.links, bodyHeightPt, marginTopPt = bodyTopPt)
+        stampSlotsRaster(doc, config, density, defaultFontFamily, header, footer, bands, doc.numberOfPages)
+        return doc
+    }
+
+    private fun stampSlotsRaster(
+        doc: PDDocument,
+        config: PdfPageConfig,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        header: (@Composable (PdfPageInfo) -> Unit)?,
+        footer: (@Composable (PdfPageInfo) -> Unit)?,
+        bands: SlotBands,
+        pageCount: Int,
+    ) {
+        for (pageIndex in 0 until pageCount) {
+            val info = PdfPageInfo(pageIndex, pageCount)
+            val page = doc.getPage(pageIndex)
+            if (header != null && bands.headerPx > 0) {
+                stampSlotRaster(
+                    doc, page, config, density, defaultFontFamily, header, info,
+                    bandHeightPx = bands.headerPx,
+                    topPt = config.margins.top.value,
+                    heightPt = bands.headerPt,
+                )
+            }
+            if (footer != null && bands.footerPx > 0) {
+                stampSlotRaster(
+                    doc, page, config, density, defaultFontFamily, footer, info,
+                    bandHeightPx = bands.footerPx,
+                    topPt = config.height.value - config.margins.bottom.value - bands.footerPt,
+                    heightPt = bands.footerPt,
+                )
+            }
+        }
+    }
+
+    private fun stampSlotRaster(
+        doc: PDDocument,
+        page: PDPage,
+        config: PdfPageConfig,
+        density: Density,
+        defaultFontFamily: FontFamily?,
+        slot: @Composable (PdfPageInfo) -> Unit,
+        info: PdfPageInfo,
+        bandHeightPx: Int,
+        topPt: Float,
+        heightPt: Float,
+    ) {
+        val linkCollector = PdfLinkCollector()
+        val bitmap = renderComposeToBitmap(config.contentWidthPx(density), bandHeightPx, density) {
+            WrapContent(defaultFontFamily, linkCollector, config) { slot(info) }
+        }
+        val pdImage = LosslessFactory.createFromImage(doc, bitmap)
+        val cs = PDPageContentStream(doc, page, PDPageContentStream.AppendMode.APPEND, true, true)
+        try {
+            cs.drawImage(
+                pdImage,
+                config.margins.left.value,
+                config.height.value - topPt - heightPt,
+                config.contentWidth.value,
+                heightPt,
+            )
+        } finally {
+            cs.close()
+        }
+        for (link in linkCollector.links) {
+            addLinkToPage(
+                page, config.height.value, config.margins.left.value, topPt,
+                link.href, link.x, link.y, link.width, link.height,
+            )
+        }
+    }
 
     private fun renderVectorWithSlots(
         config: PdfPageConfig,
