@@ -11,6 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## Unreleased
+
+### Added
+
+- **Per-page headers and footers** -- new `header`/`footer` slots on the auto-pagination `renderToPdf` overloads. Slots receive `PdfPageInfo` (`pageIndex`, `pageCount`, `pageNumber`) for "Page X of Y" numbering; slot height is measured once and reserved uniformly on every page.
+
+### Fixed
+
+- Raster auto-pagination no longer stretches the last partial page slice to the full content height.
+
+---
+
 ## 1.0.0
 
 Initial public release.

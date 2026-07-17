@@ -52,8 +52,8 @@ Compose Multiplatform compatibility matrix (`.github/workflows/compatibility.yml
 ## Public API
 
 ```kotlin
-renderToPdf(config, density, mode, defaultFontFamily, pagination) { content } → ByteArray  // auto-paginates by default
-renderToPdf(outputStream, config, density, mode, defaultFontFamily, pagination) { content }  // streaming variant
+renderToPdf(config, density, mode, defaultFontFamily, pagination, header, footer) { content } → ByteArray  // auto-paginates by default
+renderToPdf(outputStream, config, density, mode, defaultFontFamily, pagination, header, footer) { content }  // streaming variant
 renderToPdf(pages, config, density, mode, defaultFontFamily) { pageIndex → content } → ByteArray  // manual pages
 renderToPdf(outputStream, pages, config, density, mode, defaultFontFamily) { pageIndex → content }  // streaming variant
 PdfLink(href) { content }
@@ -62,7 +62,7 @@ PdfRoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)
 Shape.asPdfSafe()
 ```
 
-Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargins + `landscape()`), `PdfMargins` (None/Narrow/Normal + `symmetric()`), `PdfPagination` (AUTO/SINGLE_PAGE), `Density`, `RenderMode` (VECTOR/RASTER), `InterFontFamily`, `Compose2PdfException`, `LocalPdfPageConfig`.
+Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargins + `landscape()`), `PdfMargins` (None/Narrow/Normal + `symmetric()`), `PdfPagination` (AUTO/SINGLE_PAGE), `Density`, `RenderMode` (VECTOR/RASTER), `InterFontFamily`, `Compose2PdfException`, `LocalPdfPageConfig`, `PdfPageInfo` (pageIndex, pageCount, pageNumber).
 
 ## Key Files
 
@@ -108,11 +108,13 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 - **Bundled fonts loaded from classpath** — `FontResolver` loads Inter fonts directly from `InputStream`, no temp files
 - **`Compose2PdfException` wraps rendering errors** — `IllegalArgumentException` (precondition failures) passes through unwrapped
 - **OutputStream overloads don't close the stream** — caller owns the stream lifecycle; `PDDocument.use { it.save(outputStream) }` is called internally
+- **Raster slices draw top-aligned at proportional height** — `addBitmapPage(topPt, heightPt)`; a partial last slice must never be stretched to the full content rect.
 
 ### Auto-pagination
 - **Measures in tall scene** — `PdfRenderer` uses a 200K px max scene height for measurement; Compose `Constraints` limit is ~262K px
 - **Falls back for single-page content** — If measured height ≤ page height or ≥ max height (fillMaxHeight detected), falls back to original single-page rendering path for identical output
 - **PaginatedColumn keeps children together** — Inserts padding at page boundaries so no direct child is split; oversized children (taller than a page) flow across pages
+- **Header/footer slots reserve uniform bands** — slot heights measured once with a `PdfPageInfo(0, 2)` sentinel; height must be stable across pages (taller content is clipped). With slots present, `LocalPdfPageConfig` exposes the *effective* (band-reduced) content area, which is what keeps the public `PaginatedColumn` breaking at the right height. Null slots take the exact pre-slots code path (fidelity guarantee), pinned by `NullSlotRegressionTest` golden files — if an intentional render change breaks it, delete `compose2pdf/src/test/resources/golden/` and re-run twice.
 
 ### Testing
 - **Fidelity tests assume identical render path** — Changing `renderToPdf` default behavior (e.g., wrapping content in extra layout layers or using a taller scene) can break fidelity comparisons; single-page content must fall back to the original render path
@@ -123,7 +125,7 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 - Package: `com.chrisjenx.compose2pdf`
 - Internal implementation in `com.chrisjenx.compose2pdf.internal`
 - `internal` visibility by default for implementation classes
-- Public API: `renderToPdf()`, `PdfLink()`, `PaginatedColumn()`, `LocalPdfPageConfig`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
+- Public API: `renderToPdf()`, `PdfLink()`, `PaginatedColumn()`, `LocalPdfPageConfig`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `PdfPageInfo`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
 - Tests use `kotlin-test`
 
 ## Publishing
