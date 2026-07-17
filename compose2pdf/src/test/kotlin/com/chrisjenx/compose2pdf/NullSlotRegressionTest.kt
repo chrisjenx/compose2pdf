@@ -16,10 +16,14 @@ import kotlin.test.assertEquals
 import kotlin.test.fail
 
 /**
- * Pins the header/footer-less render path: with no slots, output must be identical
- * to the baseline captured before the header/footer feature. Compares decoded page
- * content streams because PDFBox writes a time-seeded document ID into every save.
- * Shapes-only fixture: no text, so the streams are platform-deterministic.
+ * Pins the header/footer-less (null-slot) render path against golden content streams.
+ * The goldens were captured on this branch AFTER the raster last-slice stretch fix but
+ * BEFORE the header/footer slot code was added — NOT a pre-any-change baseline. Their
+ * purpose is to guard the no-slot path against unintended regressions from later slot-code
+ * changes (e.g. this test catching whether the imageCache fix or the stamp-loop dedup
+ * accidentally altered null-slot output), not to prove parity with pre-branch behavior.
+ * Compares decoded page content streams because PDFBox writes a time-seeded document ID
+ * into every save. Shapes-only fixture: no text, so the streams are platform-deterministic.
  *
  * If this fails after an INTENTIONAL rendering change, delete the golden files and
  * re-run the test twice to regenerate and verify.

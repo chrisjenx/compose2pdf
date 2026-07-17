@@ -37,8 +37,11 @@ class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeE
  *   area. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
  *   sentinel, so `if (pageCount > 1)` footers still reserve space) and that height is
  *   reserved uniformly on every page — slot height must be stable across pages; taller
- *   content is clipped to the band. Inside the body, [LocalPdfPageConfig] reflects the
- *   content area reduced by the bands.
+ *   content is clipped to the band. The slot's rendered HEIGHT must therefore stay the
+ *   same on every page; its content may still vary by `pageIndex`/`pageCount` (e.g.
+ *   "Page 3 of 10"), but if that varying content is taller than the once-measured band
+ *   on a given page, it is clipped on that page. Inside the body, [LocalPdfPageConfig]
+ *   reflects the content area reduced by the bands.
  * @param footer Optional composable stamped at the bottom of every page. Same rules as [header].
  * @param content The composable content to render.
  * @throws Compose2PdfException if rendering fails.
@@ -94,8 +97,11 @@ fun renderToPdf(
  *   area. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
  *   sentinel, so `if (pageCount > 1)` footers still reserve space) and that height is
  *   reserved uniformly on every page — slot height must be stable across pages; taller
- *   content is clipped to the band. Inside the body, [LocalPdfPageConfig] reflects the
- *   content area reduced by the bands.
+ *   content is clipped to the band. The slot's rendered HEIGHT must therefore stay the
+ *   same on every page; its content may still vary by `pageIndex`/`pageCount` (e.g.
+ *   "Page 3 of 10"), but if that varying content is taller than the once-measured band
+ *   on a given page, it is clipped on that page. Inside the body, [LocalPdfPageConfig]
+ *   reflects the content area reduced by the bands.
  * @param footer Optional composable stamped at the bottom of every page. Same rules as [header].
  * @param content The composable content to render.
  * @return A valid PDF as a ByteArray.
