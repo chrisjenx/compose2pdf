@@ -28,6 +28,7 @@ import com.chrisjenx.compose2pdf.*
 | [`PdfLink`]({{ site.baseurl }}/api/pdf-link) | Clickable URL annotation composable |
 | [`PaginatedColumn`]({{ site.baseurl }}/api/paginated-column) | Column layout with page-break protection |
 | [`LocalPdfPageConfig`]({{ site.baseurl }}/api/local-pdf-page-config) | CompositionLocal for page dimensions inside `renderToPdf` |
+| [`PdfPageInfo`]({{ site.baseurl }}/api/pdf-page-info) | Page index/count passed to `header`/`footer` slots |
 | [`RenderMode`]({{ site.baseurl }}/api/render-mode) | Vector or raster rendering mode |
 | [`PdfRoundedCornerShape`]({{ site.baseurl }}/api/pdf-rounded-corner-shape) | PDF-safe rounded corners for non-uniform radii |
 | [`Shape.asPdfSafe()`]({{ site.baseurl }}/api/pdf-rounded-corner-shape) | Wrap any shape for correct PDF rendering |

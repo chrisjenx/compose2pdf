@@ -19,6 +19,8 @@ fun renderToPdf(
     mode: RenderMode = RenderMode.VECTOR,
     defaultFontFamily: FontFamily? = InterFontFamily,
     pagination: PdfPagination = PdfPagination.AUTO,
+    header: (@Composable (PdfPageInfo) -> Unit)? = null,
+    footer: (@Composable (PdfPageInfo) -> Unit)? = null,
     content: @Composable () -> Unit,
 ): ByteArray
 ```
@@ -36,6 +38,8 @@ With `PdfPagination.AUTO` (the default), direct children of `content` are treate
 | `mode` | [`RenderMode`]({{ site.baseurl }}/api/render-mode) | `RenderMode.VECTOR` | Vector (SVG-based) or raster rendering |
 | `defaultFontFamily` | `FontFamily?` | [`InterFontFamily`]({{ site.baseurl }}/api/fonts) | Font family for the default text style. When non-null, content is wrapped so both Compose and PDFBox use the same font. Pass `null` for system fonts |
 | `pagination` | `PdfPagination` | `PdfPagination.AUTO` | Controls page splitting. `AUTO` automatically paginates. `SINGLE_PAGE` clips to one page |
+| `header` | `(@Composable (`[`PdfPageInfo`]({{ site.baseurl }}/api/pdf-page-info)`) -> Unit)?` | `null` | Optional composable stamped at the top of every page, above the content area. Height is measured once (using a `pageCount = 2` sentinel so `if (pageCount > 1)` footers still reserve space) and reserved uniformly on every page; taller content is clipped. See [Headers and footers]({{ site.baseurl }}/usage/auto-pagination#headers-and-footers) |
+| `footer` | `(@Composable (`[`PdfPageInfo`]({{ site.baseurl }}/api/pdf-page-info)`) -> Unit)?` | `null` | Optional composable stamped at the bottom of every page. Same measurement/reservation rules as `header`. See [Headers and footers]({{ site.baseurl }}/usage/auto-pagination#headers-and-footers) |
 | `content` | `@Composable () -> Unit` | -- | The composable content to render |
 
 ### Returns
@@ -47,7 +51,7 @@ With `PdfPagination.AUTO` (the default), direct children of `content` are treate
 | Exception | When |
 |:----------|:-----|
 | [`Compose2PdfException`]({{ site.baseurl }}/api/exceptions) | Rendering fails (wraps the underlying cause) |
-| `IllegalArgumentException` | Precondition failures (not wrapped) |
+| `IllegalArgumentException` | Precondition failures (not wrapped), including a measured `header` + `footer` height that leaves no room for content |
 
 ### Example
 
@@ -76,6 +80,8 @@ fun renderToPdf(
     mode: RenderMode = RenderMode.VECTOR,
     defaultFontFamily: FontFamily? = InterFontFamily,
     pagination: PdfPagination = PdfPagination.AUTO,
+    header: (@Composable (PdfPageInfo) -> Unit)? = null,
+    footer: (@Composable (PdfPageInfo) -> Unit)? = null,
     content: @Composable () -> Unit,
 )
 ```
@@ -200,5 +206,6 @@ Both overloads are **not thread-safe**. Concurrent calls should be serialized ex
 
 - [Usage: Single Page]({{ site.baseurl }}/usage/single-page)
 - [Usage: Multi-page]({{ site.baseurl }}/usage/multi-page)
-- [Usage: Auto-pagination]({{ site.baseurl }}/usage/auto-pagination)
+- [Usage: Auto-pagination]({{ site.baseurl }}/usage/auto-pagination) -- including the Headers and footers section
+- [API Reference: PdfPageInfo]({{ site.baseurl }}/api/pdf-page-info) -- Type passed to `header`/`footer` slots
 - [Guide: Server-side & Ktor]({{ site.baseurl }}/guides/server-side)

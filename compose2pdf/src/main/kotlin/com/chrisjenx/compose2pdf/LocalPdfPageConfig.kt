@@ -16,6 +16,13 @@ import androidx.compose.runtime.compositionLocalOf
  * }
  * ```
  *
+ * When [renderToPdf] is called with `header`/`footer` slots, the config seen by the
+ * BODY `content` reflects the *effective* content area: margins are inflated by the
+ * measured band heights, so `contentHeight` is already reduced by the header/footer
+ * bands. This is what keeps [PaginatedColumn] breaking pages at the right height without
+ * needing to know about the bands itself. The `header`/`footer` slot content, by
+ * contrast, sees the original, unreduced page config.
+ *
  * @see PdfPageConfig
  * @see renderToPdf
  */
