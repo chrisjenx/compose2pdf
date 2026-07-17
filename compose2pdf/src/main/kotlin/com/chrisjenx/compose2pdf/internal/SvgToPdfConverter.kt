@@ -59,6 +59,7 @@ internal object SvgToPdfConverter {
      * margins, clipping, and page offsets.
      *
      * Parses the SVG once and renders each page slice, up to [maxPages].
+     * @return the number of pages emitted (clamped to [maxPages])
      */
     fun addAutoPages(
         pdfDoc: PDDocument,
@@ -69,7 +70,7 @@ internal object SvgToPdfConverter {
         maxPages: Int,
         fontCache: MutableMap<String, PDFont>,
         imageCache: MutableMap<String, PDImageXObject>,
-    ) {
+    ): Int {
         val (svgRoot, defs) = parseSvg(svg)
         val pageCount = kotlin.math.ceil(totalContentHeightPt.toDouble() / layout.contentHeightPt)
             .toInt().coerceIn(1, maxPages)
@@ -85,6 +86,30 @@ internal object SvgToPdfConverter {
                 fontCache = fontCache,
                 imageCache = imageCache,
             )
+        }
+        return pageCount
+    }
+
+    /**
+     * Draws [svg] into the content area defined by [layout] on an EXISTING [page],
+     * appending to its content stream and clipping to the area. Used to stamp
+     * header/footer bands onto already-emitted pages.
+     */
+    fun drawSvgOnPage(
+        pdfDoc: PDDocument,
+        page: PDPage,
+        svg: String,
+        layout: PageLayout,
+        density: Float,
+        fontCache: MutableMap<String, PDFont> = mutableMapOf(),
+        imageCache: MutableMap<String, PDImageXObject> = mutableMapOf(),
+    ) {
+        val (svgRoot, defs) = parseSvg(svg)
+        val cs = PDPageContentStream(pdfDoc, page, PDPageContentStream.AppendMode.APPEND, true, true)
+        try {
+            drawSvgContent(cs, pdfDoc, svgRoot, defs, layout, density, verticalOffsetPt = 0f, fontCache, imageCache)
+        } finally {
+            cs.close()
         }
     }
 
@@ -104,25 +129,40 @@ internal object SvgToPdfConverter {
 
         val cs = PDPageContentStream(pdfDoc, page)
         try {
-            val marginBottom = layout.pageHeightPt - layout.marginTopPt - layout.contentHeightPt
-            cs.addRect(layout.marginLeftPt, marginBottom, layout.contentWidthPt, layout.contentHeightPt)
-            cs.clip()
-
-            val scale = 1f / density
-            cs.transform(
-                CoordinateTransform.contentAreaMatrix(
-                    scale,
-                    layout.marginLeftPt,
-                    layout.marginTopPt,
-                    layout.pageHeightPt,
-                    verticalOffsetPt,
-                )
-            )
-
-            PageRenderer(cs, pdfDoc, defs, fontCache, imageCache).renderChildren(svgRoot)
+            drawSvgContent(cs, pdfDoc, svgRoot, defs, layout, density, verticalOffsetPt, fontCache, imageCache)
         } finally {
             cs.close()
         }
+    }
+
+    /** Clips to [layout]'s content area and renders the parsed SVG into it. */
+    private fun drawSvgContent(
+        cs: PDPageContentStream,
+        pdfDoc: PDDocument,
+        svgRoot: Element,
+        defs: Map<String, Element>,
+        layout: PageLayout,
+        density: Float,
+        verticalOffsetPt: Float,
+        fontCache: MutableMap<String, PDFont>,
+        imageCache: MutableMap<String, PDImageXObject>,
+    ) {
+        val marginBottom = layout.pageHeightPt - layout.marginTopPt - layout.contentHeightPt
+        cs.addRect(layout.marginLeftPt, marginBottom, layout.contentWidthPt, layout.contentHeightPt)
+        cs.clip()
+
+        val scale = 1f / density
+        cs.transform(
+            CoordinateTransform.contentAreaMatrix(
+                scale,
+                layout.marginLeftPt,
+                layout.marginTopPt,
+                layout.pageHeightPt,
+                verticalOffsetPt,
+            )
+        )
+
+        PageRenderer(cs, pdfDoc, defs, fontCache, imageCache).renderChildren(svgRoot)
     }
 
     private val documentBuilderFactory: DocumentBuilderFactory by lazy {
