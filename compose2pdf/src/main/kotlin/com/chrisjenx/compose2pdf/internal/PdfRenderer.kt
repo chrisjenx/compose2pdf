@@ -191,7 +191,10 @@ internal object PdfRenderer {
             val sliceHeight = minOf(contentHeightPx, measuredHeightPx - sliceTop)
             if (sliceHeight <= 0) break
             val slice = fullBitmap.getSubimage(0, sliceTop, contentWidthPx, sliceHeight)
-            addBitmapPage(doc, config, slice)
+            addBitmapPage(
+                doc, config, slice,
+                heightPt = config.contentHeight.value * sliceHeight / contentHeightPx,
+            )
         }
 
         distributeLinks(doc, config, linkCollector.links, config.contentHeight.value)
@@ -312,6 +315,8 @@ internal object PdfRenderer {
         doc: PDDocument,
         config: PdfPageConfig,
         bitmap: BufferedImage,
+        topPt: Float = config.margins.top.value,
+        heightPt: Float = config.contentHeight.value,
     ) {
         val mediaBox = PDRectangle(config.width.value, config.height.value)
         val page = PDPage(mediaBox)
@@ -323,9 +328,9 @@ internal object PdfRenderer {
             contentStream.drawImage(
                 pdImage,
                 config.margins.left.value,
-                config.margins.bottom.value,
+                config.height.value - topPt - heightPt,
                 config.contentWidth.value,
-                config.contentHeight.value,
+                heightPt,
             )
         } finally {
             contentStream.close()
