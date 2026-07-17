@@ -91,7 +91,7 @@ Supported (not an error): one page via the band path with `PdfPageInfo(0, 1)`, b
 
 Mirrors vector: body bitmap rendered at the full content width and sliced at `effectiveContentHeightPx`; slot bitmaps rendered per page and drawn into the bands. `addBitmapPage` gains a destination-rect-aware variant — the current fixed dest rect (`margins.left, margins.bottom, contentWidth, contentHeight`) cannot place band-reduced slices.
 
-**Precursor — suspected existing raster bug:** the last partial slice today is drawn into that fixed full-height dest rect, which appears to stretch it vertically (the auto-pagination fidelity test only checks pages are non-blank, so this would not have been caught). Verify at runtime first; if real, fix it (draw partial slices at proportional height, top-aligned) as a standalone change **before** building the band math on top.
+**Precursor — existing raster bug, confirmed at runtime (2026-07-16):** the last partial slice is drawn into that fixed full-height dest rect and is vertically stretched. Reproduction: a 1047dp red box (1.5 pages) in raster mode yields a page-2 image of 698px (half a page of content) rendered red across the *entire* content area instead of only the top half. The auto-pagination fidelity test only checks pages are non-blank, so this was never caught. Fix it (draw partial slices at proportional height, top-aligned) as a standalone change **before** building the band math on top.
 
 ## Testing
 
