@@ -23,10 +23,11 @@ class HeaderFooterVectorTest {
     private val config = PdfPageConfig.A4WithMargins // page 595x842pt, margins 72pt, content 451x698pt
     private val mode = RenderMode.VECTOR
 
-    // Band geometry at 72 DPI (1pt = 1px), y measured from page top. Bands sit within the
-    // 72pt margins (10pt gap to the body), so body area is unchanged at [72, 770]pt:
-    // header band: 22..62 (40dp header, bottom 10pt above body top at 72) — sample y=42
-    // footer band: 780..810 (30dp footer, top 10pt below body bottom at 770) — sample y=795
+    // Band geometry at 72 DPI (1pt = 1px), y measured from page top. Bands anchor to the
+    // physical page edge (18pt inset) rather than the body margin; body area is unchanged at
+    // [72, 770]pt since the bands (edge inset + band height + gap) fit within the 72pt margins:
+    // header band: [18, 58] (40dp header, 18pt inset from the top edge) — sample y=38
+    // footer band: [794, 824] (30dp footer, 18pt inset from the bottom edge) — sample y=809
     private fun pagePixel(bytes: ByteArray, pageIndex: Int, y: Int): Int {
         Loader.loadPDF(bytes).use { doc ->
             val img = PDFRenderer(doc).renderImageWithDPI(pageIndex, 72f)
@@ -59,8 +60,8 @@ class HeaderFooterVectorTest {
         val pageCount = Loader.loadPDF(bytes).use { it.numberOfPages }
         assertEquals(4, pageCount)
         for (page in 0 until pageCount) {
-            assertTrue(pagePixel(bytes, page, 42).isRed(), "page $page: header band should be red")
-            assertTrue(pagePixel(bytes, page, 795).isBlue(), "page $page: footer band should be blue")
+            assertTrue(pagePixel(bytes, page, 38).isRed(), "page $page: header band should be red")
+            assertTrue(pagePixel(bytes, page, 809).isBlue(), "page $page: footer band should be blue")
         }
     }
 
@@ -89,8 +90,8 @@ class HeaderFooterVectorTest {
             Text("Short content")
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 42).isRed(), "header should be stamped on the single page")
-        assertTrue(pagePixel(bytes, 0, 795).isBlue(), "footer should be stamped on the single page")
+        assertTrue(pagePixel(bytes, 0, 38).isRed(), "header should be stamped on the single page")
+        assertTrue(pagePixel(bytes, 0, 809).isBlue(), "footer should be stamped on the single page")
         assertTrue(0 to 1 in received, "footer should have been composed with (0, 1); got $received")
     }
 
@@ -103,8 +104,8 @@ class HeaderFooterVectorTest {
             Box(Modifier.fillMaxWidth().height(2000.dp).background(Color(0xFF9E9E9E)))
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 42).isRed(), "header band must not be overdrawn by body")
-        assertTrue(pagePixel(bytes, 0, 795).isBlue(), "footer band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 38).isRed(), "header band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 809).isBlue(), "footer band must not be overdrawn by body")
     }
 
     @Test
@@ -115,8 +116,8 @@ class HeaderFooterVectorTest {
         }
         val pageCount = Loader.loadPDF(bytes).use { it.numberOfPages }
         for (page in 0 until pageCount) {
-            assertTrue(pagePixel(bytes, page, 42).isRed(), "page $page: header area is reserved")
-            assertTrue(pagePixel(bytes, page, 795).isBlue(), "page $page: footer area is reserved")
+            assertTrue(pagePixel(bytes, page, 38).isRed(), "page $page: header area is reserved")
+            assertTrue(pagePixel(bytes, page, 809).isBlue(), "page $page: footer area is reserved")
         }
     }
 
@@ -149,15 +150,15 @@ class HeaderFooterVectorTest {
             multiPageBody()
         }
         Loader.loadPDF(bytes).use { doc ->
-            // Footer band sits within the bottom margin, ending 10pt above the page's bottom
-            // margin edge: footer top (top-down) = 842-72+10=780, band 30pt tall.
-            // PDF y-up (bottom-left origin): band spans [842-810, 842-780] = [32, 62]
+            // Footer band sits near the bottom page edge, 18pt inset above it: footer top
+            // (top-down) = 842-18-30=794, band 30pt tall, bottom edge at 824.
+            // PDF y-up (bottom-left origin): band spans [842-824, 842-794] = [18, 48]
             for (i in 0 until doc.numberOfPages) {
                 val annotations = doc.getPage(i).annotations
                 assertTrue(annotations.isNotEmpty(), "page $i should have a link annotation")
                 val rect = annotations.first().rectangle
                 assertTrue(
-                    rect.lowerLeftY >= 20f && rect.upperRightY <= 80f,
+                    rect.lowerLeftY >= 6f && rect.upperRightY <= 66f,
                     "page $i: link rect should sit in the footer band, was [${rect.lowerLeftY}, ${rect.upperRightY}]",
                 )
             }

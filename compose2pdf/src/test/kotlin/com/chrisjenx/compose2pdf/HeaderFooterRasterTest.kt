@@ -55,8 +55,8 @@ class HeaderFooterRasterTest {
         val pageCount = Loader.loadPDF(bytes).use { it.numberOfPages }
         assertEquals(4, pageCount)
         for (page in 0 until pageCount) {
-            assertTrue(pagePixel(bytes, page, 42).isRed(), "page $page: header band should be red")
-            assertTrue(pagePixel(bytes, page, 795).isBlue(), "page $page: footer band should be blue")
+            assertTrue(pagePixel(bytes, page, 38).isRed(), "page $page: header band should be red")
+            assertTrue(pagePixel(bytes, page, 809).isBlue(), "page $page: footer band should be blue")
             assertTrue(page to 4 in received, "footer should have been composed with ($page, 4)")
         }
     }
@@ -72,7 +72,7 @@ class HeaderFooterRasterTest {
         // Page 2 body band spans y=72..770; its content (244dp) ends at y=72+244=316.
         assertTrue(pagePixel(bytes, 1, 200).isGray(), "page 2: top of body band should have content")
         assertFalse(pagePixel(bytes, 1, 600).isGray(), "page 2: lower body band must be blank, not stretched")
-        assertTrue(pagePixel(bytes, 1, 795).isBlue(), "page 2: footer still stamped")
+        assertTrue(pagePixel(bytes, 1, 809).isBlue(), "page 2: footer still stamped")
     }
 
     @Test
@@ -85,8 +85,8 @@ class HeaderFooterRasterTest {
             Text("Short content")
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 42).isRed())
-        assertTrue(pagePixel(bytes, 0, 795).isBlue())
+        assertTrue(pagePixel(bytes, 0, 38).isRed())
+        assertTrue(pagePixel(bytes, 0, 809).isBlue())
         assertTrue(0 to 1 in received)
     }
 
@@ -99,7 +99,7 @@ class HeaderFooterRasterTest {
             Box(Modifier.fillMaxWidth().height(2000.dp).background(Color(0xFF9E9E9E)))
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 42).isRed(), "header band must not be overdrawn by body")
-        assertTrue(pagePixel(bytes, 0, 795).isBlue(), "footer band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 38).isRed(), "header band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 809).isBlue(), "footer band must not be overdrawn by body")
     }
 }

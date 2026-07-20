@@ -41,6 +41,8 @@ internal object PdfRenderer {
     private const val MAX_MEASURE_HEIGHT_PX = 200_000
     /** Gap between a header/footer band and the body content, in PDF points. */
     private const val SLOT_BODY_GAP_PT = 10f
+    /** Printable safety margin from the physical page edge to a header/footer band, in PDF points (~0.25in). */
+    private const val SLOT_EDGE_INSET_PT = 18f
 
     /**
      * Renders single-page content to a [PDDocument]. The caller is responsible for
@@ -111,10 +113,12 @@ internal object PdfRenderer {
         }
         val headerPt = headerPx / density.density
         val footerPt = footerPx / density.density
-        val gapTop = if (headerPx > 0) SLOT_BODY_GAP_PT else 0f
-        val gapBottom = if (footerPx > 0) SLOT_BODY_GAP_PT else 0f
-        val bodyTopPt = maxOf(config.margins.top.value, headerPt + gapTop)
-        val bodyBottomPt = maxOf(config.margins.bottom.value, footerPt + gapBottom)
+        val bodyTopPt = if (headerPx > 0) {
+            maxOf(config.margins.top.value, SLOT_EDGE_INSET_PT + headerPt + SLOT_BODY_GAP_PT)
+        } else config.margins.top.value
+        val bodyBottomPt = if (footerPx > 0) {
+            maxOf(config.margins.bottom.value, SLOT_EDGE_INSET_PT + footerPt + SLOT_BODY_GAP_PT)
+        } else config.margins.bottom.value
         require(bodyTopPt + bodyBottomPt < config.height.value) {
             "Header (${headerPt}pt) and footer (${footerPt}pt) bands leave no room for content " +
                 "on a ${config.height.value}pt-tall page"
@@ -251,19 +255,16 @@ internal object PdfRenderer {
             heightPt: Float,
         ) -> Unit,
     ) {
-        val bodyTopPt = bands.effectiveConfig.margins.top.value
-        val bodyBottomPt = bands.effectiveConfig.margins.bottom.value
         for (pageIndex in 0 until pageCount) {
             val info = PdfPageInfo(pageIndex, pageCount)
             val page = doc.getPage(pageIndex)
             if (header != null && bands.headerPx > 0) {
-                // Header sits within the top margin, its bottom SLOT_BODY_GAP_PT above the body.
-                val headerTopPt = (bodyTopPt - SLOT_BODY_GAP_PT - bands.headerPt).coerceAtLeast(0f)
-                stampBand(page, info, header, bands.headerPx, headerTopPt, bands.headerPt)
+                // Header sits near the top edge, SLOT_EDGE_INSET_PT below it.
+                stampBand(page, info, header, bands.headerPx, SLOT_EDGE_INSET_PT, bands.headerPt)
             }
             if (footer != null && bands.footerPx > 0) {
-                // Footer sits within the bottom margin, its top SLOT_BODY_GAP_PT below the body.
-                val footerTopPt = config.height.value - bodyBottomPt + SLOT_BODY_GAP_PT
+                // Footer sits near the bottom edge, SLOT_EDGE_INSET_PT above it.
+                val footerTopPt = config.height.value - SLOT_EDGE_INSET_PT - bands.footerPt
                 stampBand(page, info, footer, bands.footerPx, footerTopPt, bands.footerPt)
             }
         }
