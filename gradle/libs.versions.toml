@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.4.0"
+kotlin = "2.4.10"
 compose-multiplatform = "1.11.1"
 pdfbox = "3.0.7"
 kotlinx-coroutines = "1.10.2"
