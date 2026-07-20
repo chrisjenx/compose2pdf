@@ -66,6 +66,8 @@ val pdf = renderToPdf(
 
 ## Shared headers and footers
 
+> **Tip:** with auto-pagination, `renderToPdf` has built-in `header`/`footer` slots that repeat on every page and receive a `PdfPageInfo` for page numbering — see [Headers and footers]({{ site.baseurl }}/usage/auto-pagination#headers-and-footers). The manual pattern below applies to manual `renderToPdf(pages)` documents.
+
 A common pattern is to share header/footer composables across pages and use `Spacer(Modifier.weight(1f))` to push the footer to the bottom:
 
 ```kotlin
@@ -160,7 +162,7 @@ val pdf = renderToPdf(
 |:--|:----------------|:------------------|
 | **Best for** | Flowing content (reports, lists, articles) | Fixed-layout pages (cover + data + summary) |
 | **Page breaks** | Automatic — elements kept together | You decide what goes on each page |
-| **Headers/footers** | Not supported (each page has different content) | Use `Spacer(Modifier.weight(1f))` pattern |
+| **Headers/footers** | Built-in `header`/`footer` slots with page numbers ([details]({{ site.baseurl }}/usage/auto-pagination#headers-and-footers)) | Use `Spacer(Modifier.weight(1f))` pattern |
 | **`fillMaxHeight()`** | Falls back to single page | Works as expected |
 
 ---
