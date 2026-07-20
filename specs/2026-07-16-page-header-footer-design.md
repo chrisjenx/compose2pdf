@@ -116,3 +116,15 @@ Mirrors vector: body bitmap rendered at the full content width and sliced at `ef
 - Per-page/different-first-page band heights (non-uniform page heights in pagination).
 - Slots on the manual `renderToPdf(pages)` overloads.
 - Render-once XObject reuse for static slots (possible future perf optimization; current cost is 2 small scene renders per page — negligible).
+
+## Post-review placement amendment (2026-07-20)
+
+After visual review against real-world PDF output (Chrome print reference), the band
+placement described above changed. The original design stacked bands below/above the
+full configured margin (margin-inflation: `margin + gap + bandHeight`), which pushed
+header/footer bands unnaturally far from the page edge. The final placement is
+edge-anchored inside the margins instead: bands sit `SLOT_EDGE_INSET_PT` (18pt, ~0.25in)
+from the physical page edge, with a `SLOT_BODY_GAP_PT` (10pt) gap to the body. Body
+content keeps the configured margins untouched, and only grows (via `max()`) when a
+band + inset + gap is taller than the configured margin allows. See commits `c0aa0cf`
+and `353c14d`.

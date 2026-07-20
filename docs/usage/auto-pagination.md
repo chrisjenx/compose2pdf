@@ -172,12 +172,19 @@ val pdf = renderToPdf(
 
 ### How the space works
 
-- Each slot's height is **measured once** and that height is reserved uniformly on
-  **every** page. The body content area shrinks accordingly, and `LocalPdfPageConfig`
-  (and therefore `PaginatedColumn`) reflects the reduced area automatically.
-- Slot height must be **stable across pages** — content taller than the measured band
-  is clipped. Measurement uses a `pageCount = 2` sentinel, so a footer wrapped in
-  `if (info.pageCount > 1) { ... }` still reserves its space.
+- Bands render **inside the page margins**, anchored about 0.25in (18pt) from the
+  physical page edge — the same convention as a browser's print header/footer or a
+  word processor's "header from edge" setting.
+- Adding a header/footer does **not** move or shrink your body content: the body keeps
+  using your configured `margins` as long as the band (edge inset + band height + a
+  small ~10pt gap to the body) fits within that margin. Only a band too tall for its
+  margin pushes the body inward to make room. `LocalPdfPageConfig` (and therefore
+  `PaginatedColumn`) always reflects this effective content area, which equals your
+  configured margins in the common case.
+- Each slot's height is **measured once** and is stable on **every** page — content
+  taller than the measured band is clipped. Measurement uses a `pageCount = 2`
+  sentinel, so a footer wrapped in `if (info.pageCount > 1) { ... }` still reserves
+  its space.
 - A header + footer that leave no room for content throw `IllegalArgumentException`.
 - Slots work in both `VECTOR` and `RASTER` modes, with `PdfPagination.SINGLE_PAGE`,
   and on single-page documents (`pageCount == 1`).

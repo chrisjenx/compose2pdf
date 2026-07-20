@@ -33,16 +33,21 @@ class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeE
  * @param mode Vector (SVG-based) or raster rendering. Defaults to VECTOR.
  * @param defaultFontFamily The default text font family. Defaults to [InterFontFamily] (bundled Inter).
  * @param pagination Controls page splitting. Defaults to [PdfPagination.AUTO].
- * @param header Optional composable stamped at the top of every page, above the content
- *   area. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
+ * @param header Optional composable stamped at the top of every page, anchored ~18pt
+ *   (0.25in) from the physical page edge — inside the page margin, like a browser print
+ *   header. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
  *   sentinel, so `if (pageCount > 1)` footers still reserve space) and that height is
- *   reserved uniformly on every page — slot height must be stable across pages; taller
- *   content is clipped to the band. The slot's rendered HEIGHT must therefore stay the
- *   same on every page; its content may still vary by `pageIndex`/`pageCount` (e.g.
- *   "Page 3 of 10"), but if that varying content is taller than the once-measured band
- *   on a given page, it is clipped on that page. Inside the body, [LocalPdfPageConfig]
- *   reflects the content area reduced by the bands.
- * @param footer Optional composable stamped at the bottom of every page. Same rules as [header].
+ *   stable on every page — taller content is clipped to the band. The slot's rendered
+ *   HEIGHT must therefore stay the same on every page; its content may still vary by
+ *   `pageIndex`/`pageCount` (e.g. "Page 3 of 10"), but if that varying content is taller
+ *   than the once-measured band on a given page, it is clipped on that page. Body content
+ *   keeps the configured [PdfPageConfig] margins untouched as long as the band (edge inset
+ *   + band height + a 10pt gap) fits within the margin; a band too tall for its margin
+ *   pushes the body down to fit. Inside the body, [LocalPdfPageConfig] reflects this
+ *   effective content area — identical to the configured margins unless a band overflows
+ *   them.
+ * @param footer Optional composable stamped at the bottom of every page, anchored the same
+ *   ~18pt from the bottom edge. Same rules as [header].
  * @param content The composable content to render.
  * @throws Compose2PdfException if rendering fails.
  * @throws IllegalArgumentException if the measured header + footer heights leave no room for content.
@@ -93,16 +98,21 @@ fun renderToPdf(
  *   Pass null to use system fonts instead, or supply your own [FontFamily].
  * @param pagination Controls page splitting. [PdfPagination.AUTO] automatically paginates
  *   overflowing content. [PdfPagination.SINGLE_PAGE] clips to a single page.
- * @param header Optional composable stamped at the top of every page, above the content
- *   area. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
+ * @param header Optional composable stamped at the top of every page, anchored ~18pt
+ *   (0.25in) from the physical page edge — inside the page margin, like a browser print
+ *   header. Receives [PdfPageInfo]. Its height is measured once (with a `pageCount = 2`
  *   sentinel, so `if (pageCount > 1)` footers still reserve space) and that height is
- *   reserved uniformly on every page — slot height must be stable across pages; taller
- *   content is clipped to the band. The slot's rendered HEIGHT must therefore stay the
- *   same on every page; its content may still vary by `pageIndex`/`pageCount` (e.g.
- *   "Page 3 of 10"), but if that varying content is taller than the once-measured band
- *   on a given page, it is clipped on that page. Inside the body, [LocalPdfPageConfig]
- *   reflects the content area reduced by the bands.
- * @param footer Optional composable stamped at the bottom of every page. Same rules as [header].
+ *   stable on every page — taller content is clipped to the band. The slot's rendered
+ *   HEIGHT must therefore stay the same on every page; its content may still vary by
+ *   `pageIndex`/`pageCount` (e.g. "Page 3 of 10"), but if that varying content is taller
+ *   than the once-measured band on a given page, it is clipped on that page. Body content
+ *   keeps the configured [PdfPageConfig] margins untouched as long as the band (edge inset
+ *   + band height + a 10pt gap) fits within the margin; a band too tall for its margin
+ *   pushes the body down to fit. Inside the body, [LocalPdfPageConfig] reflects this
+ *   effective content area — identical to the configured margins unless a band overflows
+ *   them.
+ * @param footer Optional composable stamped at the bottom of every page, anchored the same
+ *   ~18pt from the bottom edge. Same rules as [header].
  * @param content The composable content to render.
  * @return A valid PDF as a ByteArray.
  * @throws Compose2PdfException if rendering fails.
