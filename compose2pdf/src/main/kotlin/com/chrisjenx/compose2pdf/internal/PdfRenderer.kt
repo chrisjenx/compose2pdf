@@ -39,6 +39,8 @@ internal object PdfRenderer {
     private const val MAX_AUTO_PAGES = 100
     // Compose Constraints max dimension is ~262143px. Stay well under that limit.
     private const val MAX_MEASURE_HEIGHT_PX = 200_000
+    /** Gap between a header/footer band and the body content, in PDF points. */
+    private const val SLOT_BODY_GAP_PT = 10f
 
     /**
      * Renders single-page content to a [PDDocument]. The caller is responsible for
@@ -109,11 +111,16 @@ internal object PdfRenderer {
         }
         val headerPt = headerPx / density.density
         val footerPt = footerPx / density.density
+        val gapTop = if (headerPx > 0) SLOT_BODY_GAP_PT else 0f
+        val gapBottom = if (footerPx > 0) SLOT_BODY_GAP_PT else 0f
+        val bodyTopPt = maxOf(config.margins.top.value, headerPt + gapTop)
+        val bodyBottomPt = maxOf(config.margins.bottom.value, footerPt + gapBottom)
+        require(bodyTopPt + bodyBottomPt < config.height.value) {
+            "Header (${headerPt}pt) and footer (${footerPt}pt) bands leave no room for content " +
+                "on a ${config.height.value}pt-tall page"
+        }
         val effectiveConfig = config.copy(
-            margins = config.margins.copy(
-                top = config.margins.top + headerPt.dp,
-                bottom = config.margins.bottom + footerPt.dp,
-            )
+            margins = config.margins.copy(top = bodyTopPt.dp, bottom = bodyBottomPt.dp)
         )
         return SlotBands(headerPx, footerPx, headerPt, footerPt, effectiveConfig)
     }
@@ -145,7 +152,7 @@ internal object PdfRenderer {
             contentWidthPt = config.contentWidth.value,
             contentHeightPt = effectivePx / density.density,
             marginLeftPt = config.margins.left.value,
-            marginTopPt = config.margins.top.value + bands.headerPt,
+            marginTopPt = bands.effectiveConfig.margins.top.value,
         )
     }
 
@@ -171,7 +178,7 @@ internal object PdfRenderer {
     ): PDDocument {
         val contentWidthPx = config.contentWidthPx(density)
         val effectivePx = bands.effectiveConfig.contentHeightPx(density)
-        val bodyTopPt = config.margins.top.value + bands.headerPt
+        val bodyTopPt = bands.effectiveConfig.margins.top.value
         val bodyHeightPt = effectivePx / density.density
         val bodyLinks = PdfLinkCollector()
         val doc = PDDocument()
@@ -244,18 +251,20 @@ internal object PdfRenderer {
             heightPt: Float,
         ) -> Unit,
     ) {
+        val bodyTopPt = bands.effectiveConfig.margins.top.value
+        val bodyBottomPt = bands.effectiveConfig.margins.bottom.value
         for (pageIndex in 0 until pageCount) {
             val info = PdfPageInfo(pageIndex, pageCount)
             val page = doc.getPage(pageIndex)
             if (header != null && bands.headerPx > 0) {
-                stampBand(page, info, header, bands.headerPx, config.margins.top.value, bands.headerPt)
+                // Header sits within the top margin, its bottom SLOT_BODY_GAP_PT above the body.
+                val headerTopPt = (bodyTopPt - SLOT_BODY_GAP_PT - bands.headerPt).coerceAtLeast(0f)
+                stampBand(page, info, header, bands.headerPx, headerTopPt, bands.headerPt)
             }
             if (footer != null && bands.footerPx > 0) {
-                // Footer anchors to the bottom margin so px->pt rounding slop lands in the body gap, not off-page.
-                stampBand(
-                    page, info, footer, bands.footerPx,
-                    config.height.value - config.margins.bottom.value - bands.footerPt, bands.footerPt,
-                )
+                // Footer sits within the bottom margin, its top SLOT_BODY_GAP_PT below the body.
+                val footerTopPt = config.height.value - bodyBottomPt + SLOT_BODY_GAP_PT
+                stampBand(page, info, footer, bands.footerPx, footerTopPt, bands.footerPt)
             }
         }
     }

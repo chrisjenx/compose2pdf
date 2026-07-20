@@ -48,29 +48,31 @@ class HeaderFooterRasterTest {
             received += info.pageIndex to info.pageCount
             Box(Modifier.fillMaxWidth().height(30.dp).background(Color.Blue))
         }) {
-            // 12 x 200dp children; effective page = 628dp -> 3/page -> 4 pages
+            // 12 x 200dp children; bands fit within the 72pt margins, so effective page = 698dp
+            // (unchanged from a no-slot doc) -> 3/page -> 4 pages
             repeat(12) { Spacer(Modifier.fillMaxWidth().height(200.dp)) }
         }
         val pageCount = Loader.loadPDF(bytes).use { it.numberOfPages }
         assertEquals(4, pageCount)
         for (page in 0 until pageCount) {
-            assertTrue(pagePixel(bytes, page, 92).isRed(), "page $page: header band should be red")
-            assertTrue(pagePixel(bytes, page, 755).isBlue(), "page $page: footer band should be blue")
+            assertTrue(pagePixel(bytes, page, 42).isRed(), "page $page: header band should be red")
+            assertTrue(pagePixel(bytes, page, 795).isBlue(), "page $page: footer band should be blue")
             assertTrue(page to 4 in received, "footer should have been composed with ($page, 4)")
         }
     }
 
     @Test
     fun `raster partial last slice with bands is not stretched`() {
-        // Effective page = 628dp. 942dp body = 1.5 effective pages: page 2 holds 314dp.
+        // Effective page = 698dp (bands fit inside the margins, body area unchanged).
+        // 942dp body = 1.5 effective pages: page 2 holds 942-698 = 244dp.
         val bytes = renderToPdf(config = config, mode = mode, header = redHeader, footer = blueFooter) {
             Box(Modifier.fillMaxWidth().height(942.dp).background(Color(0xFF9E9E9E)))
         }
         assertEquals(2, Loader.loadPDF(bytes).use { it.numberOfPages })
-        // Page 2 body band spans y=112..740; its content (314dp) ends at y=112+314=426.
+        // Page 2 body band spans y=72..770; its content (244dp) ends at y=72+244=316.
         assertTrue(pagePixel(bytes, 1, 200).isGray(), "page 2: top of body band should have content")
         assertFalse(pagePixel(bytes, 1, 600).isGray(), "page 2: lower body band must be blank, not stretched")
-        assertTrue(pagePixel(bytes, 1, 755).isBlue(), "page 2: footer still stamped")
+        assertTrue(pagePixel(bytes, 1, 795).isBlue(), "page 2: footer still stamped")
     }
 
     @Test
@@ -83,8 +85,8 @@ class HeaderFooterRasterTest {
             Text("Short content")
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 92).isRed())
-        assertTrue(pagePixel(bytes, 0, 755).isBlue())
+        assertTrue(pagePixel(bytes, 0, 42).isRed())
+        assertTrue(pagePixel(bytes, 0, 795).isBlue())
         assertTrue(0 to 1 in received)
     }
 
@@ -97,7 +99,7 @@ class HeaderFooterRasterTest {
             Box(Modifier.fillMaxWidth().height(2000.dp).background(Color(0xFF9E9E9E)))
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 92).isRed(), "header band must not be overdrawn by body")
-        assertTrue(pagePixel(bytes, 0, 755).isBlue(), "footer band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 42).isRed(), "header band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 795).isBlue(), "footer band must not be overdrawn by body")
     }
 }

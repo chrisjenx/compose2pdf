@@ -23,9 +23,10 @@ class HeaderFooterVectorTest {
     private val config = PdfPageConfig.A4WithMargins // page 595x842pt, margins 72pt, content 451x698pt
     private val mode = RenderMode.VECTOR
 
-    // Band geometry at 72 DPI (1pt = 1px), y measured from page top:
-    // header band: 72..112 (40dp header) — sample y=92
-    // footer band: 842-72-30=740..770 (30dp footer) — sample y=755
+    // Band geometry at 72 DPI (1pt = 1px), y measured from page top. Bands sit within the
+    // 72pt margins (10pt gap to the body), so body area is unchanged at [72, 770]pt:
+    // header band: 22..62 (40dp header, bottom 10pt above body top at 72) — sample y=42
+    // footer band: 780..810 (30dp footer, top 10pt below body bottom at 770) — sample y=795
     private fun pagePixel(bytes: ByteArray, pageIndex: Int, y: Int): Int {
         Loader.loadPDF(bytes).use { doc ->
             val img = PDFRenderer(doc).renderImageWithDPI(pageIndex, 72f)
@@ -44,7 +45,8 @@ class HeaderFooterVectorTest {
         Box(Modifier.fillMaxWidth().height(30.dp).background(Color.Blue))
     }
 
-    /** 12 x 200dp children; effective page = 698-40-30 = 628dp -> 3 children/page -> 4 pages. */
+    /** 12 x 200dp children; bands fit within the 72pt margins, so effective page = 698dp
+     *  (unchanged from a no-slot doc) -> 3 children/page -> 4 pages. */
     private val multiPageBody: @Composable () -> Unit = {
         repeat(12) { Spacer(Modifier.fillMaxWidth().height(200.dp)) }
     }
@@ -57,8 +59,8 @@ class HeaderFooterVectorTest {
         val pageCount = Loader.loadPDF(bytes).use { it.numberOfPages }
         assertEquals(4, pageCount)
         for (page in 0 until pageCount) {
-            assertTrue(pagePixel(bytes, page, 92).isRed(), "page $page: header band should be red")
-            assertTrue(pagePixel(bytes, page, 755).isBlue(), "page $page: footer band should be blue")
+            assertTrue(pagePixel(bytes, page, 42).isRed(), "page $page: header band should be red")
+            assertTrue(pagePixel(bytes, page, 795).isBlue(), "page $page: footer band should be blue")
         }
     }
 
@@ -87,8 +89,8 @@ class HeaderFooterVectorTest {
             Text("Short content")
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 92).isRed(), "header should be stamped on the single page")
-        assertTrue(pagePixel(bytes, 0, 755).isBlue(), "footer should be stamped on the single page")
+        assertTrue(pagePixel(bytes, 0, 42).isRed(), "header should be stamped on the single page")
+        assertTrue(pagePixel(bytes, 0, 795).isBlue(), "footer should be stamped on the single page")
         assertTrue(0 to 1 in received, "footer should have been composed with (0, 1); got $received")
     }
 
@@ -101,8 +103,8 @@ class HeaderFooterVectorTest {
             Box(Modifier.fillMaxWidth().height(2000.dp).background(Color(0xFF9E9E9E)))
         }
         assertEquals(1, Loader.loadPDF(bytes).use { it.numberOfPages })
-        assertTrue(pagePixel(bytes, 0, 92).isRed(), "header band must not be overdrawn by body")
-        assertTrue(pagePixel(bytes, 0, 755).isBlue(), "footer band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 42).isRed(), "header band must not be overdrawn by body")
+        assertTrue(pagePixel(bytes, 0, 795).isBlue(), "footer band must not be overdrawn by body")
     }
 
     @Test
@@ -113,8 +115,8 @@ class HeaderFooterVectorTest {
         }
         val pageCount = Loader.loadPDF(bytes).use { it.numberOfPages }
         for (page in 0 until pageCount) {
-            assertTrue(pagePixel(bytes, page, 92).isRed(), "page $page: header area is reserved")
-            assertTrue(pagePixel(bytes, page, 755).isBlue(), "page $page: footer area is reserved")
+            assertTrue(pagePixel(bytes, page, 42).isRed(), "page $page: header area is reserved")
+            assertTrue(pagePixel(bytes, page, 795).isBlue(), "page $page: footer area is reserved")
         }
     }
 
@@ -147,13 +149,15 @@ class HeaderFooterVectorTest {
             multiPageBody()
         }
         Loader.loadPDF(bytes).use { doc ->
-            // 698 - 0 - footer band; footer top is at 842-72-footerPt; PDF y-up: band spans [72, 72+footerPt]
+            // Footer band sits within the bottom margin, ending 10pt above the page's bottom
+            // margin edge: footer top (top-down) = 842-72+10=780, band 30pt tall.
+            // PDF y-up (bottom-left origin): band spans [842-810, 842-780] = [32, 62]
             for (i in 0 until doc.numberOfPages) {
                 val annotations = doc.getPage(i).annotations
                 assertTrue(annotations.isNotEmpty(), "page $i should have a link annotation")
                 val rect = annotations.first().rectangle
                 assertTrue(
-                    rect.lowerLeftY >= 60f && rect.upperRightY <= 120f,
+                    rect.lowerLeftY >= 20f && rect.upperRightY <= 80f,
                     "page $i: link rect should sit in the footer band, was [${rect.lowerLeftY}, ${rect.upperRightY}]",
                 )
             }
@@ -163,7 +167,8 @@ class HeaderFooterVectorTest {
     @Test
     fun `paginated column inside providers breaks at the effective page height`() {
         // Public PaginatedColumn reads LocalPdfPageConfig; with slots it must see the
-        // effective (reduced) content height or children split across boundaries.
+        // effective content height (here unchanged, since the bands fit inside the margins)
+        // or children split across boundaries.
         val bytes = renderToPdf(config = config, mode = mode, header = redHeader, footer = blueFooter) {
             Box { // hides children from the automatic outer PaginatedColumn
                 PaginatedColumn {
@@ -171,7 +176,7 @@ class HeaderFooterVectorTest {
                 }
             }
         }
-        // Same math as multiPageBody: 3 x 200dp per 628dp effective page -> 4 pages
+        // Same math as multiPageBody: 3 x 200dp per 698dp effective page -> 4 pages
         assertEquals(4, Loader.loadPDF(bytes).use { it.numberOfPages })
     }
 }

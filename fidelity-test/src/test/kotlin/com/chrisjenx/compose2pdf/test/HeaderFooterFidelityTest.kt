@@ -18,9 +18,9 @@ import com.chrisjenx.compose2pdf.PdfPageInfo
 import com.chrisjenx.compose2pdf.RenderMode
 import com.chrisjenx.compose2pdf.renderToPdf
 import org.apache.pdfbox.Loader
+import java.awt.image.BufferedImage
 import java.io.File
 import kotlin.test.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class HeaderFooterFidelityTest {
@@ -75,14 +75,28 @@ class HeaderFooterFidelityTest {
                     val img = rasterizePdf(doc, renderDpi, page = i)
                     saveImage(img, imagesDir, "header-footer-$modeName-p$i.png")
 
-                    // At 144 DPI: 1pt = 2px. Margins are 72pt -> 144px. Sample the band centers.
+                    // Bands now sit within the page margins rather than being added on top of
+                    // them, so their exact offset depends on band height. Scan the whole top
+                    // margin band (rows above the 72pt body-top line, i.e. y in [0, 144) at
+                    // 144 DPI) and the whole bottom margin band (rows below the 72pt body-bottom
+                    // line) for any non-whitish ink, instead of hardcoding an exact sample point.
                     val xMid = img.width / 2
-                    val headerY = 144 + 20 // ~10pt into the header band
-                    val footerY = img.height - 144 - 20 // ~10pt above the bottom margin
-                    assertFalse(img.isWhitishAt(xMid, headerY), "$mode page $i: header band should be drawn")
-                    assertFalse(img.isWhitishAt(xMid, footerY), "$mode page $i: footer band should be drawn")
+                    assertTrue(
+                        img.hasInkInRows(xMid, 0, 144),
+                        "$mode page $i: header band should be drawn in the top margin",
+                    )
+                    assertTrue(
+                        img.hasInkInRows(xMid, img.height - 144, img.height),
+                        "$mode page $i: footer band should be drawn in the bottom margin",
+                    )
                 }
             }
         }
     }
+}
+
+/** True if any pixel in column [xCol], rows [yStart, yEnd), is not whitish. */
+private fun BufferedImage.hasInkInRows(xCol: Int, yStart: Int, yEnd: Int): Boolean {
+    for (y in yStart until yEnd) if (!isWhitishAt(xCol, y)) return true
+    return false
 }
