@@ -59,7 +59,6 @@ internal object SvgToPdfConverter {
      * margins, clipping, and page offsets.
      *
      * Parses the SVG once and renders each page slice, up to [maxPages].
-     * @return the number of pages emitted (clamped to [maxPages])
      */
     fun addAutoPages(
         pdfDoc: PDDocument,
@@ -70,7 +69,7 @@ internal object SvgToPdfConverter {
         maxPages: Int,
         fontCache: MutableMap<String, PDFont>,
         imageCache: MutableMap<String, PDImageXObject>,
-    ): Int {
+    ) {
         val (svgRoot, defs) = parseSvg(svg)
         val pageCount = kotlin.math.ceil(totalContentHeightPt.toDouble() / layout.contentHeightPt)
             .toInt().coerceIn(1, maxPages)
@@ -87,7 +86,6 @@ internal object SvgToPdfConverter {
                 imageCache = imageCache,
             )
         }
-        return pageCount
     }
 
     /**

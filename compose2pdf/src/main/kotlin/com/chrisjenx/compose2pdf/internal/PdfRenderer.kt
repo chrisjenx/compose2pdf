@@ -87,6 +87,8 @@ internal object PdfRenderer {
      * Each effective margin is `max(configured margin, SLOT_EDGE_INSET_PT + band height +
      * SLOT_BODY_GAP_PT)` — equal to the configured margin when the band fits within it, and
      * larger only when the band + inset + gap exceeds the configured margin.
+     * [effectiveContentHeightPx] is `effectiveConfig.contentHeightPx(density)`, cached here so
+     * callers don't each recompute it.
      */
     internal class SlotBands(
         val headerPx: Int,
@@ -94,6 +96,7 @@ internal object PdfRenderer {
         val headerPt: Float,
         val footerPt: Float,
         val effectiveConfig: PdfPageConfig,
+        val effectiveContentHeightPx: Int,
     )
 
     /**
@@ -118,12 +121,8 @@ internal object PdfRenderer {
         }
         val headerPt = headerPx / density.density
         val footerPt = footerPx / density.density
-        val bodyTopPt = if (headerPx > 0) {
-            maxOf(config.margins.top.value, SLOT_EDGE_INSET_PT + headerPt + SLOT_BODY_GAP_PT)
-        } else config.margins.top.value
-        val bodyBottomPt = if (footerPx > 0) {
-            maxOf(config.margins.bottom.value, SLOT_EDGE_INSET_PT + footerPt + SLOT_BODY_GAP_PT)
-        } else config.margins.bottom.value
+        val bodyTopPt = effectiveMarginPt(config.margins.top.value, headerPx, headerPt)
+        val bodyBottomPt = effectiveMarginPt(config.margins.bottom.value, footerPx, footerPt)
         // Compute the effective body height in px (floored, same as the body's actual render
         // resolution) BEFORE building effectiveConfig. A pt-space guard alone is not enough:
         // the body renders in px, so a sub-pixel remainder (0 < remaining pt < 1/density pt)
@@ -137,8 +136,16 @@ internal object PdfRenderer {
         val effectiveConfig = config.copy(
             margins = config.margins.copy(top = bodyTopPt.dp, bottom = bodyBottomPt.dp)
         )
-        return SlotBands(headerPx, footerPx, headerPt, footerPt, effectiveConfig)
+        return SlotBands(headerPx, footerPx, headerPt, footerPt, effectiveConfig, effectiveContentHeightPx)
     }
+
+    /**
+     * The effective margin for one side: equal to [configuredPt] when there's no band on that
+     * side, or when the band fits within it; otherwise grown just enough to fit
+     * [SLOT_EDGE_INSET_PT] + the band + [SLOT_BODY_GAP_PT].
+     */
+    private fun effectiveMarginPt(configuredPt: Float, bandPx: Int, bandPt: Float): Float =
+        if (bandPx > 0) maxOf(configuredPt, SLOT_EDGE_INSET_PT + bandPt + SLOT_BODY_GAP_PT) else configuredPt
 
     private fun measureSlotHeight(
         slot: (@Composable (PdfPageInfo) -> Unit)?,
@@ -159,27 +166,14 @@ internal object PdfRenderer {
     }
 
     /** PageLayout for the body area between the bands. Content height derives from px. */
-    private fun bodyLayout(config: PdfPageConfig, density: Density, bands: SlotBands): PageLayout {
-        val effectivePx = bands.effectiveConfig.contentHeightPx(density)
-        return PageLayout(
-            pageWidthPt = config.width.value,
-            pageHeightPt = config.height.value,
-            contentWidthPt = config.contentWidth.value,
-            contentHeightPt = effectivePx / density.density,
-            marginLeftPt = config.margins.left.value,
-            marginTopPt = bands.effectiveConfig.margins.top.value,
+    private fun bodyLayout(density: Density, bands: SlotBands): PageLayout =
+        PageLayout.from(bands.effectiveConfig).copy(
+            contentHeightPt = bands.effectiveContentHeightPx / density.density,
         )
-    }
 
     /** PageLayout describing a slot band ([bandHeightPt] tall, [marginTopPt] from the page top). */
-    private fun slotLayout(config: PdfPageConfig, bandHeightPt: Float, marginTopPt: Float) = PageLayout(
-        pageWidthPt = config.width.value,
-        pageHeightPt = config.height.value,
-        contentWidthPt = config.contentWidth.value,
-        contentHeightPt = bandHeightPt,
-        marginLeftPt = config.margins.left.value,
-        marginTopPt = marginTopPt,
-    )
+    private fun slotLayout(config: PdfPageConfig, bandHeightPt: Float, marginTopPt: Float): PageLayout =
+        PageLayout.from(config).copy(contentHeightPt = bandHeightPt, marginTopPt = marginTopPt)
 
     private fun renderRasterWithSlots(
         config: PdfPageConfig,
@@ -192,21 +186,16 @@ internal object PdfRenderer {
         content: @Composable () -> Unit,
     ): PDDocument {
         val contentWidthPx = config.contentWidthPx(density)
-        val effectivePx = bands.effectiveConfig.contentHeightPx(density)
+        val effectivePx = bands.effectiveContentHeightPx
         val bodyTopPt = bands.effectiveConfig.margins.top.value
         val bodyHeightPt = effectivePx / density.density
         val bodyLinks = PdfLinkCollector()
         val doc = PDDocument()
 
-        val measuredHeightPx = if (pagination == PdfPagination.SINGLE_PAGE) effectivePx else {
-            ComposeToSvg.measureContentHeight(contentWidthPx, MAX_MEASURE_HEIGHT_PX, density) {
-                WrapContent(defaultFontFamily, null, bands.effectiveConfig) {
-                    PaginatedColumn(contentHeightPx = effectivePx) { content() }
-                }
-            }
-        }
+        val measuredHeightPx: Int? = if (pagination == PdfPagination.SINGLE_PAGE) null
+            else measureForPagination(bands.effectiveConfig, density, defaultFontFamily, content)
 
-        if (measuredHeightPx <= effectivePx || measuredHeightPx >= MAX_MEASURE_HEIGHT_PX) {
+        if (measuredHeightPx == null) {
             val bitmap = renderComposeToBitmap(contentWidthPx, effectivePx, density) {
                 WrapContent(defaultFontFamily, bodyLinks, bands.effectiveConfig) { content() }
             }
@@ -242,15 +231,18 @@ internal object PdfRenderer {
         return doc
     }
 
+    /** Which band a stamped slot is: picks the vector image cache in [stampSlotsVector]. */
+    private enum class SlotKind { HEADER, FOOTER }
+
     /**
      * Shared per-page iteration for the with-slots stamping paths ([stampSlotsVector] and
      * [stampSlotsRaster]): for each page, builds the real (non-sentinel) [PdfPageInfo] and
      * invokes [stampBand] for the header then the footer, skipping either when absent or
      * when its measured band is zero-height. The mode-specific drawing (raster bitmap vs.
-     * vector SVG) lives in [stampBand]; [stampBand]'s `isHeader` flag lets the vector path
-     * pick a per-slot-kind image cache (see [stampSlotsVector]) — raster ignores it. Does
-     * NOT touch the null-slot dispatch in [renderSinglePage] or the plain render paths —
-     * those stay untouched.
+     * vector SVG) lives in [stampBand]; [stampBand]'s [SlotKind] lets the vector path pick a
+     * per-slot-kind image cache (see [stampSlotsVector]) — raster ignores it. Does NOT touch
+     * the null-slot dispatch in [renderSinglePage] or the plain render paths — those stay
+     * untouched.
      */
     private fun stampSlotsOnEachPage(
         doc: PDDocument,
@@ -266,20 +258,21 @@ internal object PdfRenderer {
             bandHeightPx: Int,
             topPt: Float,
             heightPt: Float,
-            isHeader: Boolean,
+            kind: SlotKind,
         ) -> Unit,
     ) {
+        // Header sits near the top edge, SLOT_EDGE_INSET_PT below it; footer sits near the
+        // bottom edge, SLOT_EDGE_INSET_PT above it. Both are page-invariant.
+        val headerTopPt = SLOT_EDGE_INSET_PT
+        val footerTopPt = config.height.value - SLOT_EDGE_INSET_PT - bands.footerPt
         for (pageIndex in 0 until pageCount) {
             val info = PdfPageInfo(pageIndex, pageCount)
             val page = doc.getPage(pageIndex)
             if (header != null && bands.headerPx > 0) {
-                // Header sits near the top edge, SLOT_EDGE_INSET_PT below it.
-                stampBand(page, info, header, bands.headerPx, SLOT_EDGE_INSET_PT, bands.headerPt, true)
+                stampBand(page, info, header, bands.headerPx, headerTopPt, bands.headerPt, SlotKind.HEADER)
             }
             if (footer != null && bands.footerPx > 0) {
-                // Footer sits near the bottom edge, SLOT_EDGE_INSET_PT above it.
-                val footerTopPt = config.height.value - SLOT_EDGE_INSET_PT - bands.footerPt
-                stampBand(page, info, footer, bands.footerPx, footerTopPt, bands.footerPt, false)
+                stampBand(page, info, footer, bands.footerPx, footerTopPt, bands.footerPt, SlotKind.FOOTER)
             }
         }
     }
@@ -315,25 +308,13 @@ internal object PdfRenderer {
         val bitmap = renderComposeToBitmap(config.contentWidthPx(density), bandHeightPx, density) {
             WrapContent(defaultFontFamily, linkCollector, config) { slot(info) }
         }
-        val pdImage = LosslessFactory.createFromImage(doc, bitmap)
         val cs = PDPageContentStream(doc, page, PDPageContentStream.AppendMode.APPEND, true, true)
         try {
-            cs.drawImage(
-                pdImage,
-                config.margins.left.value,
-                config.height.value - topPt - heightPt,
-                config.contentWidth.value,
-                heightPt,
-            )
+            drawBitmapInto(cs, doc, config, bitmap, topPt, heightPt)
         } finally {
             cs.close()
         }
-        for (link in linkCollector.links) {
-            addLinkToPage(
-                page, config.height.value, config.margins.left.value, topPt,
-                link.href, link.x, link.y, link.width, link.height,
-            )
-        }
+        stampLinks(page, config.height.value, config.margins.left.value, topPt, linkCollector.links)
     }
 
     private fun renderVectorWithSlots(
@@ -347,8 +328,8 @@ internal object PdfRenderer {
         content: @Composable () -> Unit,
     ): PDDocument {
         val contentWidthPx = config.contentWidthPx(density)
-        val effectivePx = bands.effectiveConfig.contentHeightPx(density)
-        val layout = bodyLayout(config, density, bands)
+        val effectivePx = bands.effectiveContentHeightPx
+        val layout = bodyLayout(density, bands)
 
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
@@ -360,17 +341,11 @@ internal object PdfRenderer {
         val bodyImageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
         val bodyLinks = PdfLinkCollector()
 
-        val singlePage = pagination == PdfPagination.SINGLE_PAGE || run {
-            val measuredHeightPx = ComposeToSvg.measureContentHeight(contentWidthPx, MAX_MEASURE_HEIGHT_PX, density) {
-                WrapContent(defaultFontFamily, null, bands.effectiveConfig) {
-                    PaginatedColumn(contentHeightPx = effectivePx) { content() }
-                }
-            }
-            measuredHeightPx <= effectivePx || measuredHeightPx >= MAX_MEASURE_HEIGHT_PX
-        }
+        val measuredHeightPx: Int? = if (pagination == PdfPagination.SINGLE_PAGE) null
+            else measureForPagination(bands.effectiveConfig, density, defaultFontFamily, content)
 
         val pageCount: Int
-        if (singlePage) {
+        if (measuredHeightPx == null) {
             val svg = ComposeToSvg.render(contentWidthPx, effectivePx, density) {
                 WrapContent(defaultFontFamily, bodyLinks, bands.effectiveConfig) { content() }
             }
@@ -389,10 +364,11 @@ internal object PdfRenderer {
                     "Auto-pagination truncated: content requires ~$estimatedPages pages but max is $MAX_AUTO_PAGES"
                 )
             }
-            pageCount = SvgToPdfConverter.addAutoPages(
+            SvgToPdfConverter.addAutoPages(
                 pdfDoc, result.svg, layout, totalContentHeightPt,
                 density.density, MAX_AUTO_PAGES, fontCache, bodyImageCache,
             )
+            pageCount = pdfDoc.numberOfPages
         }
 
         distributeLinks(pdfDoc, config, bodyLinks.links, layout.contentHeightPt, marginTopPt = layout.marginTopPt)
@@ -418,9 +394,9 @@ internal object PdfRenderer {
         // shared — it's keyed semantically by family/weight/style, not by per-document id.
         val headerImageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
         val footerImageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
-        stampSlotsOnEachPage(pdfDoc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt, isHeader ->
+        stampSlotsOnEachPage(pdfDoc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt, kind ->
             val bandLayout = slotLayout(config, bandHeightPt = heightPt, marginTopPt = topPt)
-            val imageCache = if (isHeader) headerImageCache else footerImageCache
+            val imageCache = if (kind == SlotKind.HEADER) headerImageCache else footerImageCache
             stampSlotVector(pdfDoc, page, config, density, defaultFontFamily, slot, info, bandHeightPx, bandLayout, fontCache, imageCache)
         }
     }
@@ -443,9 +419,20 @@ internal object PdfRenderer {
             WrapContent(defaultFontFamily, linkCollector, config) { slot(info) }
         }
         SvgToPdfConverter.drawSvgOnPage(pdfDoc, page, svg, bandLayout, density.density, fontCache, imageCache)
-        for (link in linkCollector.links) {
+        stampLinks(page, bandLayout.pageHeightPt, bandLayout.marginLeftPt, bandLayout.marginTopPt, linkCollector.links)
+    }
+
+    /** Adds one link annotation per [links] entry, anchored at ([marginLeftPt], [marginTopPt]). */
+    private fun stampLinks(
+        page: PDPage,
+        pageHeightPt: Float,
+        marginLeftPt: Float,
+        marginTopPt: Float,
+        links: List<PdfLinkAnnotation>,
+    ) {
+        for (link in links) {
             addLinkToPage(
-                page, bandLayout.pageHeightPt, bandLayout.marginLeftPt, bandLayout.marginTopPt,
+                page, pageHeightPt, marginLeftPt, marginTopPt,
                 link.href, link.x, link.y, link.width, link.height,
             )
         }
@@ -710,19 +697,31 @@ internal object PdfRenderer {
         val page = PDPage(mediaBox)
         doc.addPage(page)
 
-        val pdImage = LosslessFactory.createFromImage(doc, bitmap)
         val contentStream = PDPageContentStream(doc, page)
         try {
-            contentStream.drawImage(
-                pdImage,
-                config.margins.left.value,
-                config.height.value - topPt - heightPt,
-                config.contentWidth.value,
-                heightPt,
-            )
+            drawBitmapInto(contentStream, doc, config, bitmap, topPt, heightPt)
         } finally {
             contentStream.close()
         }
+    }
+
+    /** Embeds [bitmap] into the content area ([config], [topPt], [heightPt]) via [cs]. */
+    private fun drawBitmapInto(
+        cs: PDPageContentStream,
+        doc: PDDocument,
+        config: PdfPageConfig,
+        bitmap: BufferedImage,
+        topPt: Float,
+        heightPt: Float,
+    ) {
+        val pdImage = LosslessFactory.createFromImage(doc, bitmap)
+        cs.drawImage(
+            pdImage,
+            config.margins.left.value,
+            config.height.value - topPt - heightPt,
+            config.contentWidth.value,
+            heightPt,
+        )
     }
 
     // --- Link annotations ---
