@@ -80,9 +80,21 @@ internal object FontResolver {
 
         // Fall back to standard PDF fonts
         val font = standardFont(families.firstOrNull(), bold, italic)
+        if (warnedFallbacks.add(key)) {
+            logger.warning(
+                "Font family '${families.firstOrNull()}' (bold=$bold, italic=$italic) could not be " +
+                    "resolved to an embeddable font; falling back to standard PDF font " +
+                    "'${font.name}'. Its glyph widths differ from the font Compose laid the text " +
+                    "out with, so letter spacing may look uneven. For exact output pass " +
+                    "defaultFontFamily = InterFontFamily (or another embeddable FontFamily) to renderToPdf.",
+            )
+        }
         fontCache[key] = font
         return font
     }
+
+    // Families already warned about falling back to a standard-14 font (avoid log spam)
+    private val warnedFallbacks = ConcurrentHashMap.newKeySet<String>()
 
     private fun parseFontFamilyList(family: String?): List<String> {
         if (family.isNullOrEmpty()) return listOf("sans-serif")

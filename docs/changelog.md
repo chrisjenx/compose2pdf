@@ -13,6 +13,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+### Fixed
+
+- **Uneven letter spacing with fallback fonts** -- when text was laid out with a font that couldn't be embedded (e.g. the platform default `.SF NS` on macOS or Roboto on Linux servers), the standard-14 Helvetica fallback drew glyphs at its own widths inside the original font's glyph positions, so wider glyphs (like `%`) collided with the following character. Overflowing glyphs are now horizontally compressed to fit the space the layout reserved for them. Output with matched embedded fonts (e.g. the default `InterFontFamily`) is unchanged.
+- `FontResolver` now logs a warning when it falls back to a standard PDF font, with a pointer to `defaultFontFamily = InterFontFamily` for exact output.
+
 ## 1.3.0
 
 ### Added
