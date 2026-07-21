@@ -28,6 +28,7 @@ File("hello.pdf").writeBytes(pdfBytes)
 - **Font embedding** — bundled Inter fonts or system font resolution with automatic subsetting
 - **Link annotations** — clickable URLs in the PDF via `PdfLink`
 - **Auto-pagination** — content automatically flows across pages; elements are kept together at page boundaries
+- **Per-page headers/footers** — repeated `header`/`footer` bands with page numbering via `PdfPageInfo`
 - **Multi-page** — render multiple pages in a single PDF (manual or automatic)
 - **Page presets** — A4, Letter, A3 with configurable margins and landscape support
 - **Streaming output** — write PDFs directly to an `OutputStream` for Ktor, servlets, or any JVM server
@@ -95,6 +96,16 @@ val pdf = renderToPdf(config = PdfPageConfig.A4WithMargins) {
     DataTable(items)       // kept together on one page
     SummarySection()       // pushed to next page if needed
 }
+```
+
+### Headers and footers
+
+```kotlin
+// Per-page header/footer bands with page numbers
+val pdf = renderToPdf(
+    config = PdfPageConfig.A4WithMargins,
+    footer = { info -> Text("Page ${info.pageNumber} of ${info.pageCount}") },
+) { /* content */ }
 ```
 
 ### Manual multi-page

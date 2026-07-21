@@ -22,5 +22,7 @@ gradle.properties.local
 .claude/
 .mcp.json
 
-# Superpowers plans/specs — internal working docs, never published to the docs site
+# Superpowers plans/specs — internal working docs, never committed to the repo
 docs/superpowers/
+specs/
+.superpowers/

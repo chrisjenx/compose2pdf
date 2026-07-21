@@ -80,6 +80,7 @@ No new DSL to learn. Write `@Composable` functions, pass them to `renderToPdf()`
 | **Font embedding** | Bundled Inter fonts or system font resolution with automatic subsetting |
 | **Link annotations** | Clickable URLs in the PDF via `PdfLink` |
 | **Auto-pagination** | Content automatically flows across pages; elements kept together at boundaries |
+| **Per-page headers/footers** | Repeated `header`/`footer` bands with page numbering via `PdfPageInfo` |
 | **Multi-page** | Render multiple pages in a single PDF (automatic or manual) |
 | **Streaming output** | Write PDFs directly to an `OutputStream` for Ktor, servlets, or files |
 | **Page presets** | A4, Letter, A3 with configurable margins and landscape support |

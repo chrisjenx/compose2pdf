@@ -88,6 +88,29 @@ internal object SvgToPdfConverter {
         }
     }
 
+    /**
+     * Draws [svg] into the content area defined by [layout] on an EXISTING [page],
+     * appending to its content stream and clipping to the area. Used to stamp
+     * header/footer bands onto already-emitted pages.
+     */
+    fun drawSvgOnPage(
+        pdfDoc: PDDocument,
+        page: PDPage,
+        svg: String,
+        layout: PageLayout,
+        density: Float,
+        fontCache: MutableMap<String, PDFont> = mutableMapOf(),
+        imageCache: MutableMap<String, PDImageXObject> = mutableMapOf(),
+    ) {
+        val (svgRoot, defs) = parseSvg(svg)
+        val cs = PDPageContentStream(pdfDoc, page, PDPageContentStream.AppendMode.APPEND, true, true)
+        try {
+            drawSvgContent(cs, pdfDoc, svgRoot, defs, layout, density, verticalOffsetPt = 0f, fontCache, imageCache)
+        } finally {
+            cs.close()
+        }
+    }
+
     private fun renderSvgToContentArea(
         pdfDoc: PDDocument,
         svgRoot: Element,
@@ -104,25 +127,40 @@ internal object SvgToPdfConverter {
 
         val cs = PDPageContentStream(pdfDoc, page)
         try {
-            val marginBottom = layout.pageHeightPt - layout.marginTopPt - layout.contentHeightPt
-            cs.addRect(layout.marginLeftPt, marginBottom, layout.contentWidthPt, layout.contentHeightPt)
-            cs.clip()
-
-            val scale = 1f / density
-            cs.transform(
-                CoordinateTransform.contentAreaMatrix(
-                    scale,
-                    layout.marginLeftPt,
-                    layout.marginTopPt,
-                    layout.pageHeightPt,
-                    verticalOffsetPt,
-                )
-            )
-
-            PageRenderer(cs, pdfDoc, defs, fontCache, imageCache).renderChildren(svgRoot)
+            drawSvgContent(cs, pdfDoc, svgRoot, defs, layout, density, verticalOffsetPt, fontCache, imageCache)
         } finally {
             cs.close()
         }
+    }
+
+    /** Clips to [layout]'s content area and renders the parsed SVG into it. */
+    private fun drawSvgContent(
+        cs: PDPageContentStream,
+        pdfDoc: PDDocument,
+        svgRoot: Element,
+        defs: Map<String, Element>,
+        layout: PageLayout,
+        density: Float,
+        verticalOffsetPt: Float,
+        fontCache: MutableMap<String, PDFont>,
+        imageCache: MutableMap<String, PDImageXObject>,
+    ) {
+        val marginBottom = layout.pageHeightPt - layout.marginTopPt - layout.contentHeightPt
+        cs.addRect(layout.marginLeftPt, marginBottom, layout.contentWidthPt, layout.contentHeightPt)
+        cs.clip()
+
+        val scale = 1f / density
+        cs.transform(
+            CoordinateTransform.contentAreaMatrix(
+                scale,
+                layout.marginLeftPt,
+                layout.marginTopPt,
+                layout.pageHeightPt,
+                verticalOffsetPt,
+            )
+        )
+
+        PageRenderer(cs, pdfDoc, defs, fontCache, imageCache).renderChildren(svgRoot)
     }
 
     private val documentBuilderFactory: DocumentBuilderFactory by lazy {
@@ -406,6 +444,17 @@ internal object SvgToPdfConverter {
             cs.restoreGraphicsState()
         }
 
+        /**
+         * Decodes and caches a data-URI image by the SVG element's [id] — O(1), unlike
+         * keying by the (potentially multi-MB) [href] content string. Skia's SVGCanvas
+         * restarts element ids (e.g. `img0`) from zero for every separate SVG document, so
+         * ids are only unique WITHIN one document. Callers that render body + header/footer
+         * bands as separate documents must give each document its OWN `imageCache` (see
+         * [PdfRenderer]) — that structurally prevents the cross-document collision this
+         * cache would otherwise risk, while still deduping genuinely-identical images
+         * within a single document (e.g. a logo repeated many times in a long body, or
+         * stamped on every page's header/footer).
+         */
         private fun decodeImage(href: String, id: String): PDImageXObject? {
             if (id.isNotEmpty()) imageCache[id]?.let { return it }
             if (!href.startsWith("data:image/")) return null

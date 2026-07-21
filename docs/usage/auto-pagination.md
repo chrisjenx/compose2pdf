@@ -140,9 +140,58 @@ FileOutputStream("report.pdf").use { out ->
 |:--|:----------------|:------------------|
 | **Best for** | Flowing content (reports, lists, articles) | Fixed-layout pages (cover + data + summary) |
 | **Page breaks** | Automatic -- elements kept together | You decide what goes on each page |
-| **Headers/footers** | Not supported per-page | Use `Spacer(Modifier.weight(1f))` pattern |
+| **Headers/footers** | Supported via `header`/`footer` slots | Use `Spacer(Modifier.weight(1f))` pattern |
 | **Page count** | Determined automatically | Must be known upfront |
 | **`fillMaxHeight()`** | Falls back to single page | Works as expected |
+
+---
+
+## Headers and footers
+
+Add a repeated header and/or footer band to every page with the `header` and `footer`
+slots. Both receive a `PdfPageInfo` with `pageIndex` (zero-based), `pageCount`, and a
+convenience `pageNumber` (one-based):
+
+```kotlin
+val pdf = renderToPdf(
+    config = PdfPageConfig.A4WithMargins,
+    header = {
+        Row(Modifier.fillMaxWidth().background(Color(0xFF1565C0)).padding(10.dp)) {
+            Text("Acme Corp", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+    },
+    footer = { info ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            Text("Page ${info.pageNumber} of ${info.pageCount}", fontSize = 9.sp)
+        }
+    },
+) {
+    // body content — auto-paginated between the bands
+}
+```
+
+### How the space works
+
+- Bands render **inside the page margins**, anchored about 0.25in (18pt) from the
+  physical page edge — the same convention as a browser's print header/footer or a
+  word processor's "header from edge" setting.
+- Adding a header/footer does **not** move or shrink your body content: the body keeps
+  using your configured `margins` as long as the band (edge inset + band height + a
+  small ~10pt gap to the body) fits within that margin. Only a band too tall for its
+  margin pushes the body inward to make room. `LocalPdfPageConfig` (and therefore
+  `PaginatedColumn`) always reflects this effective content area, which equals your
+  configured margins in the common case.
+- Each slot's height is **measured once** and is stable on **every** page — content
+  taller than the measured band is clipped. Measurement uses a `pageCount = 2`
+  sentinel, so a footer wrapped in `if (info.pageCount > 1) { ... }` still reserves
+  its space.
+- A header + footer that leave no room for content throw `IllegalArgumentException`.
+- Slots work in both `VECTOR` and `RASTER` modes, with `PdfPagination.SINGLE_PAGE`,
+  and on single-page documents (`pageCount == 1`).
+- `PdfLink` works inside slots.
+- Want a large masthead only on page 1? Keep it in the body content — the `header`
+  slot is for the repeated band. If pagination truncates at the 100-page cap,
+  `pageCount` reflects the emitted pages.
 
 ---
 
