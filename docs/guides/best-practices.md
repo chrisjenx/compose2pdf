@@ -67,14 +67,20 @@ The content area for A4 with normal margins is **451 x 698 dp** (about 6.3 x 9.7
 
 ---
 
-## Use the bundled Inter font
+## Ship your fonts with the app
 
-`InterFontFamily` (the default) guarantees:
-- Identical rendering between Compose layout and PDF embedding
-- No dependency on system fonts
-- Consistent output across macOS, Linux, and Windows
+Any font Compose lays text out with is embedded automatically, so use whatever
+typeface your design calls for. For deterministic output, prefer fonts loaded from
+your own resources over installed system fonts:
 
-Only switch to `null` (system fonts) or a custom `FontFamily` when you need a specific typeface.
+- `InterFontFamily` (the default) — zero setup, identical output everywhere
+- A custom `FontFamily` from `Font(resource = ...)` static files — your brand
+  typeface, identical output everywhere, nothing to install on servers
+- `null` (system fonts) — embeds whatever the host resolves (San Francisco on
+  macOS, Roboto/DejaVu on Linux), so output varies by machine
+
+Declare every weight/style you use from a **static** font file — bold of a
+variable-only font can't be embedded and falls back to a compressed standard font.
 
 ---
 

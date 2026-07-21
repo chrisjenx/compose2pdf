@@ -25,7 +25,7 @@ File("hello.pdf").writeBytes(pdfBytes)
 
 - **Vector PDF output** — text is selectable, scales to any zoom level
 - **Raster fallback** — pixel-perfect rendering as an embedded image
-- **Font embedding** — bundled Inter fonts or system font resolution with automatic subsetting
+- **Automatic font embedding** — any font Compose lays text out with (custom `Font(resource)`/`Font(file)` families, system fonts, bundled Inter) is captured and subset-embedded
 - **Link annotations** — clickable URLs in the PDF via `PdfLink`
 - **Auto-pagination** — content automatically flows across pages; elements are kept together at page boundaries
 - **Per-page headers/footers** — repeated `header`/`footer` bands with page numbering via `PdfPageInfo`

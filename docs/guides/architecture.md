@@ -85,21 +85,41 @@ This mode produces pixel-perfect output but text is not selectable.
 
 ## Font resolution
 
-When the converter encounters a `<text>` element with `font-family`, `font-weight`, and `font-style` attributes, `FontResolver` resolves the font:
+Skia's SVG only carries font *names*, which is lossy — custom fonts aren't installed
+on the machine, and platform defaults resolve through Skia's font manager rather than
+the filesystem. So while rendering, `ComposeFontStack` records the composition's
+`LocalFontFamilyResolver`, giving the converter access to the exact typefaces Compose
+laid the text out with. When the converter encounters a `<text>` element with
+`font-family`, `font-weight`, and `font-style` attributes, `FontResolver` resolves
+the font:
 
 ```
 1. Bundled fonts (Inter Regular/Bold/Italic/BoldItalic)
        ↓ not found
-2. System fonts (platform-specific directories)
+2. Captured typefaces (every font Compose loaded — resource/file fonts,
+   theme typography; rebuilt into embeddable bytes from Skia's table API
+   by SkiaTypefaceEmbedder)
+       ↓ not found
+3. The composition's Skia FontCollection (the shaper's own lookup —
+   system fonts, glyph-fallback runs)
+       ↓ not found
+4. Skia's system FontMgr (family-name verified)
+       ↓ not found
+5. Platform font directories
    - Exact filename match first
    - Fuzzy search up to 3 directory levels
        ↓ not found
-3. PDF Standard 14 fonts (Helvetica, Times, Courier)
+6. PDF Standard 14 fonts (Helvetica, Times, Courier) — glyphs wider than
+   the shaping font's measured advance are compressed (Tz) so substituted
+   text can never overlap, and a warning names the unresolved family
 ```
 
-Resolved fonts are cached per document (for embedding) and globally (for file path lookups) using `ConcurrentHashMap`.
+Resolved fonts are cached per document (for embedding) and globally (reconstructed
+font bytes, file path lookups) using `ConcurrentHashMap`.
 
-Variable fonts (detected by scanning for the `fvar` OpenType table) are automatically excluded.
+Variable fonts embed at their default instance; instances styled away from default
+`wght`/`wdth`/`slnt`/`ital` axes are rejected, and the filesystem search skips
+files with an `fvar` table entirely.
 
 ---
 

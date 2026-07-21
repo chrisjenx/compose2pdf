@@ -63,7 +63,7 @@ When you need pixel-perfect rendering -- complex gradients, visual effects, or e
 
 ### Font Embedding
 
-Ships with bundled Inter fonts (Regular, Bold, Italic, BoldItalic). Fonts are automatically subsetted and embedded so PDFs look the same everywhere.
+Any font Compose lays text out with — your own `Font(resource)` families, system fonts, or the bundled Inter (Regular, Bold, Italic, BoldItalic) — is automatically captured, subsetted, and embedded so PDFs look the same everywhere.
 
 ### Compose-Native API
 
@@ -77,7 +77,7 @@ No new DSL to learn. Write `@Composable` functions, pass them to `renderToPdf()`
 |:--------|:------------|
 | **Vector output** | Selectable text, crisp at any zoom, small file size |
 | **Raster fallback** | Pixel-perfect rendering as an embedded image |
-| **Font embedding** | Bundled Inter fonts or system font resolution with automatic subsetting |
+| **Font embedding** | Any font — custom, system, or bundled Inter — captured and subset-embedded automatically |
 | **Link annotations** | Clickable URLs in the PDF via `PdfLink` |
 | **Auto-pagination** | Content automatically flows across pages; elements kept together at boundaries |
 | **Per-page headers/footers** | Repeated `header`/`footer` bands with page numbering via `PdfPageInfo` |

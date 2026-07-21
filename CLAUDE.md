@@ -15,8 +15,8 @@
 
 ## Tech Stack
 
-- **Kotlin** 2.3.20, JVM target only
-- **Compose Multiplatform** 1.10.3 (Desktop)
+- **Kotlin** 2.4.0, JVM target only
+- **Compose Multiplatform** 1.11.1 (Desktop) — always confirm against `gradle/libs.versions.toml`, which is the source of truth
 - **Apache PDFBox** 3.0.7 (SVG→PDF conversion, image embedding, font subsetting)
 - **Gradle** 8.14 — versions centralized in `gradle/libs.versions.toml`
 
@@ -72,6 +72,8 @@ Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargi
 - `compose2pdf/src/main/kotlin/.../internal/SvgToPdfConverter.kt` — SVG → PDF pages
 - `compose2pdf/src/main/kotlin/.../internal/PaginatedColumn.kt` — Smart page-break layout
 - `compose2pdf/src/main/kotlin/.../internal/FontResolver.kt` — Font resolution + subsetting
+- `compose2pdf/src/main/kotlin/.../internal/TypefaceCapture.kt` — `ComposeFontStack` (reflective bridge to Compose's font stack) + captured-typeface registry
+- `compose2pdf/src/main/kotlin/.../internal/SkiaTypefaceEmbedder.kt` — rebuilds embeddable font bytes from Skia `Typeface` tables
 - `fidelity-test/src/test/.../FidelityFixtures.kt` — All fidelity test composables
 
 ## Architecture
