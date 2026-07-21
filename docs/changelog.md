@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+## 1.3.0
+
 ### Added
 
 - **Per-page headers and footers** -- new `header`/`footer` slots on the auto-pagination `renderToPdf` overloads. Slots receive `PdfPageInfo` (`pageIndex`, `pageCount`, `pageNumber`) for "Page X of Y" numbering; slot height is measured once and is stable on every page. Bands render within the page margins (~0.25in / 18pt from the page edge), leaving body content position unchanged.
