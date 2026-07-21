@@ -124,9 +124,15 @@ internal object PdfRenderer {
         val bodyBottomPt = if (footerPx > 0) {
             maxOf(config.margins.bottom.value, SLOT_EDGE_INSET_PT + footerPt + SLOT_BODY_GAP_PT)
         } else config.margins.bottom.value
-        require(bodyTopPt + bodyBottomPt < config.height.value) {
-            "Header (${headerPt}pt) and footer (${footerPt}pt) bands leave no room for content " +
-                "on a ${config.height.value}pt-tall page"
+        // Compute the effective body height in px (floored, same as the body's actual render
+        // resolution) BEFORE building effectiveConfig. A pt-space guard alone is not enough:
+        // the body renders in px, so a sub-pixel remainder (0 < remaining pt < 1/density pt)
+        // would pass a pt-space check yet floor to 0px, producing an opaque failure deep in
+        // the render pipeline instead of a clear error here.
+        val effectiveContentHeightPx = ((config.height.value - bodyTopPt - bodyBottomPt) * density.density).toInt()
+        require(effectiveContentHeightPx > 0) {
+            "Header (${headerPt}pt) and footer (${footerPt}pt) bands leave no room for page content " +
+                "on a ${config.height.value}pt-tall page at density ${density.density}"
         }
         val effectiveConfig = config.copy(
             margins = config.margins.copy(top = bodyTopPt.dp, bottom = bodyBottomPt.dp)

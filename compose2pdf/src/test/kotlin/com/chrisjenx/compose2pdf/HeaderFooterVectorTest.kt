@@ -10,6 +10,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.rendering.PDFRenderer
@@ -137,6 +138,33 @@ class HeaderFooterVectorTest {
             renderToPdf(config = config, mode = mode, header = {
                 Box(Modifier.fillMaxWidth().fillMaxHeight())
             }) {
+                Text("body")
+            }
+        }
+    }
+
+    @Test
+    fun `header and footer leaving a sub-pixel body throw IllegalArgumentException`() {
+        // Page is 100.3pt tall at density 2 (granularity 0.5pt). Header + footer bands
+        // (18pt inset + 22pt band + 10pt gap = 50pt each, 100pt total) leave exactly 0.3pt
+        // of body — sub-pixel but > 0pt in pt-space, so the old pt-space guard
+        // (bodyTopPt + bodyBottomPt < config.height.value) passed. Flooring 0.3pt to px at
+        // density 2 (0.6px -> 0) yields an effective content height of 0px, which must be
+        // rejected with a clear IllegalArgumentException rather than failing opaquely deeper
+        // in the render pipeline.
+        val subPixelConfig = PdfPageConfig(width = 200.dp, height = 100.3.dp, margins = PdfMargins.None)
+        val subPixelDensity = Density(2f)
+        val tinyHeader: @Composable (PdfPageInfo) -> Unit = {
+            Box(Modifier.fillMaxWidth().height(22.dp).background(Color.Red))
+        }
+        val tinyFooter: @Composable (PdfPageInfo) -> Unit = {
+            Box(Modifier.fillMaxWidth().height(22.dp).background(Color.Blue))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            renderToPdf(
+                config = subPixelConfig, density = subPixelDensity, mode = mode,
+                header = tinyHeader, footer = tinyFooter,
+            ) {
                 Text("body")
             }
         }
