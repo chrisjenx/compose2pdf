@@ -436,7 +436,7 @@ internal object SvgToPdfConverter {
                 elem.getAttributeNS("http://www.w3.org/1999/xlink", "href")
             } ?: return restore()
 
-            val pdImage = decodeImage(href) ?: return restore()
+            val pdImage = decodeImage(href, elem.getAttribute("id")) ?: return restore()
 
             // In the Y-flipped coordinate system, flip the image back to right-side up.
             val x = attr(elem, "x")?.toFloatOrNull() ?: 0f
@@ -447,18 +447,18 @@ internal object SvgToPdfConverter {
         }
 
         /**
-         * Decodes and caches a data-URI image by its [href] (content), NOT by the SVG
-         * element's `id`. Skia's SVGCanvas restarts element ids from zero for every
-         * separate SVG document, and the with-slots render path shares one `imageCache`
-         * across multiple documents (body + header/footer bands) — caching by id would
-         * let a later document's `img0` incorrectly resolve to an earlier document's
-         * cached image. The `href` is a `data:image/...;base64,...` URI unique to the
-         * image's content, so keying by it avoids that collision while still deduping
-         * genuinely-identical images.
+         * Decodes and caches a data-URI image by the SVG element's [id] — O(1), unlike
+         * keying by the (potentially multi-MB) [href] content string. Skia's SVGCanvas
+         * restarts element ids (e.g. `img0`) from zero for every separate SVG document, so
+         * ids are only unique WITHIN one document. Callers that render body + header/footer
+         * bands as separate documents must give each document its OWN `imageCache` (see
+         * [PdfRenderer]) — that structurally prevents the cross-document collision this
+         * cache would otherwise risk, while still deduping genuinely-identical images
+         * within a single document (e.g. a logo repeated many times in a long body, or
+         * stamped on every page's header/footer).
          */
-        private fun decodeImage(href: String): PDImageXObject? {
-            if (href.isEmpty()) return null
-            imageCache[href]?.let { return it }
+        private fun decodeImage(href: String, id: String): PDImageXObject? {
+            if (id.isNotEmpty()) imageCache[id]?.let { return it }
             if (!href.startsWith("data:image/")) return null
             val base64Data = href.substringAfter(",", "")
             if (base64Data.isEmpty()) return null
@@ -466,7 +466,7 @@ internal object SvgToPdfConverter {
                 val bytes = Base64.getDecoder().decode(base64Data)
                 val buffered = ImageIO.read(ByteArrayInputStream(bytes)) ?: return null
                 val pdImage = LosslessFactory.createFromImage(doc, buffered)
-                imageCache[href] = pdImage
+                if (id.isNotEmpty()) imageCache[id] = pdImage
                 pdImage
             } catch (_: Exception) {
                 null

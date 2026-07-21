@@ -247,8 +247,10 @@ internal object PdfRenderer {
      * [stampSlotsRaster]): for each page, builds the real (non-sentinel) [PdfPageInfo] and
      * invokes [stampBand] for the header then the footer, skipping either when absent or
      * when its measured band is zero-height. The mode-specific drawing (raster bitmap vs.
-     * vector SVG) lives in [stampBand]. Does NOT touch the null-slot dispatch in
-     * [renderSinglePage] or the plain render paths — those stay untouched.
+     * vector SVG) lives in [stampBand]; [stampBand]'s `isHeader` flag lets the vector path
+     * pick a per-slot-kind image cache (see [stampSlotsVector]) — raster ignores it. Does
+     * NOT touch the null-slot dispatch in [renderSinglePage] or the plain render paths —
+     * those stay untouched.
      */
     private fun stampSlotsOnEachPage(
         doc: PDDocument,
@@ -264,6 +266,7 @@ internal object PdfRenderer {
             bandHeightPx: Int,
             topPt: Float,
             heightPt: Float,
+            isHeader: Boolean,
         ) -> Unit,
     ) {
         for (pageIndex in 0 until pageCount) {
@@ -271,12 +274,12 @@ internal object PdfRenderer {
             val page = doc.getPage(pageIndex)
             if (header != null && bands.headerPx > 0) {
                 // Header sits near the top edge, SLOT_EDGE_INSET_PT below it.
-                stampBand(page, info, header, bands.headerPx, SLOT_EDGE_INSET_PT, bands.headerPt)
+                stampBand(page, info, header, bands.headerPx, SLOT_EDGE_INSET_PT, bands.headerPt, true)
             }
             if (footer != null && bands.footerPx > 0) {
                 // Footer sits near the bottom edge, SLOT_EDGE_INSET_PT above it.
                 val footerTopPt = config.height.value - SLOT_EDGE_INSET_PT - bands.footerPt
-                stampBand(page, info, footer, bands.footerPx, footerTopPt, bands.footerPt)
+                stampBand(page, info, footer, bands.footerPx, footerTopPt, bands.footerPt, false)
             }
         }
     }
@@ -291,7 +294,7 @@ internal object PdfRenderer {
         bands: SlotBands,
         pageCount: Int,
     ) {
-        stampSlotsOnEachPage(doc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt ->
+        stampSlotsOnEachPage(doc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt, _ ->
             stampSlotRaster(doc, page, config, density, defaultFontFamily, slot, info, bandHeightPx, topPt, heightPt)
         }
     }
@@ -349,7 +352,12 @@ internal object PdfRenderer {
 
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
-        val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
+        // The body is rendered as its own SVG document (or one tall auto-paginated document),
+        // separate from the header/footer bands. Skia restarts element ids per document, so
+        // each document needs its OWN image cache — sharing one across documents would let a
+        // later document's `img0` incorrectly resolve to an earlier document's cached image.
+        // See stampSlotsVector for the header/footer caches.
+        val bodyImageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
         val bodyLinks = PdfLinkCollector()
 
         val singlePage = pagination == PdfPagination.SINGLE_PAGE || run {
@@ -366,7 +374,7 @@ internal object PdfRenderer {
             val svg = ComposeToSvg.render(contentWidthPx, effectivePx, density) {
                 WrapContent(defaultFontFamily, bodyLinks, bands.effectiveConfig) { content() }
             }
-            SvgToPdfConverter.addPage(pdfDoc, svg, layout, density.density, fontCache, imageCache)
+            SvgToPdfConverter.addPage(pdfDoc, svg, layout, density.density, fontCache, bodyImageCache)
             pageCount = 1
         } else {
             val result = ComposeToSvg.renderWithMeasurement(contentWidthPx, MAX_MEASURE_HEIGHT_PX, density) {
@@ -383,12 +391,12 @@ internal object PdfRenderer {
             }
             pageCount = SvgToPdfConverter.addAutoPages(
                 pdfDoc, result.svg, layout, totalContentHeightPt,
-                density.density, MAX_AUTO_PAGES, fontCache, imageCache,
+                density.density, MAX_AUTO_PAGES, fontCache, bodyImageCache,
             )
         }
 
         distributeLinks(pdfDoc, config, bodyLinks.links, layout.contentHeightPt, marginTopPt = layout.marginTopPt)
-        stampSlotsVector(pdfDoc, config, density, defaultFontFamily, header, footer, bands, pageCount, fontCache, imageCache)
+        stampSlotsVector(pdfDoc, config, density, defaultFontFamily, header, footer, bands, pageCount, fontCache)
         return pdfDoc
     }
 
@@ -402,10 +410,17 @@ internal object PdfRenderer {
         bands: SlotBands,
         pageCount: Int,
         fontCache: MutableMap<String, org.apache.pdfbox.pdmodel.font.PDFont>,
-        imageCache: MutableMap<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>,
     ) {
-        stampSlotsOnEachPage(pdfDoc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt ->
+        // Header and footer are each rendered as their OWN SVG document per page (see
+        // stampSlotVector), separate from the body and from each other. Each therefore gets
+        // its own image cache: Skia restarts element ids per document, so a shared cache
+        // could let e.g. a footer's `img0` resolve to a cached header image. fontCache stays
+        // shared — it's keyed semantically by family/weight/style, not by per-document id.
+        val headerImageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
+        val footerImageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
+        stampSlotsOnEachPage(pdfDoc, config, bands, pageCount, header, footer) { page, info, slot, bandHeightPx, topPt, heightPt, isHeader ->
             val bandLayout = slotLayout(config, bandHeightPt = heightPt, marginTopPt = topPt)
+            val imageCache = if (isHeader) headerImageCache else footerImageCache
             stampSlotVector(pdfDoc, page, config, density, defaultFontFamily, slot, info, bandHeightPx, bandLayout, fontCache, imageCache)
         }
     }
