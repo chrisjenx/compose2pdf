@@ -128,6 +128,18 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 - Public API: `renderToPdf()`, `PdfLink()`, `PaginatedColumn()`, `LocalPdfPageConfig`, `PdfPageConfig`, `PdfMargins`, `PdfPagination`, `PdfPageInfo`, `RenderMode`, `Density`, `InterFontFamily`, `PdfRoundedCornerShape`, `Shape.asPdfSafe()`, `Compose2PdfException` — everything else is `internal`
 - Tests use `kotlin-test`
 
-## Publishing
+## Publishing & Releasing
 
-Maven Central via Sonatype (`s01.oss.sonatype.org`), group ID `com.chrisjenx`. Requires `ossrhUsername`, `ossrhPassword`, and `signing.keyId` in `local.properties` or environment variables.
+Published to **Maven Central** (Central Portal) under group ID `com.chrisjenx` via the **vanniktech maven-publish plugin** (`publishToMavenCentral()` + `signAllPublications()` in `compose2pdf/build.gradle.kts`). Version lives in `gradle.properties` (`version=`); `main` sits on a `-SNAPSHOT` between releases.
+
+**Cutting a release** — fully automated by the **Release** workflow (`.github/workflows/release.yml`), a manual `workflow_dispatch`:
+
+```bash
+gh workflow run release.yml -f version=X.Y.Z   # e.g. 1.3.0 — no leading "v"
+```
+
+It validates the version (semver format + tag not already present), builds and runs unit + fidelity tests on ubuntu & macOS (JDK 17), runs `publishAndReleaseToMavenCentral`, creates the `vX.Y.Z` tag and a GitHub Release (`--generate-notes`), then bumps `gradle.properties` to the next patch `-SNAPSHOT` and pushes to `main`. **Before triggering**, roll the changelog's `## Unreleased` heading to `## X.Y.Z` (entries carry no date). Version follows semver from the last `vX.Y.Z` tag: new feature → minor, fix-only → patch.
+
+**Snapshots** — every push to `main` touching library sources auto-publishes a `-SNAPSHOT` via `snapshot.yml` (`publishAllPublicationsToMavenCentralRepository`).
+
+**Credentials** — publishing auth lives in GitHub Actions secrets (`MAVEN_CENTRAL_USERNAME`/`MAVEN_CENTRAL_PASSWORD` + in-memory signing key `SIGNING_KEY_ID`/`SIGNING_KEY`/`SIGNING_KEY_PASSWORD`), passed to Gradle as `ORG_GRADLE_PROJECT_*`. For a local `publishToMavenLocal`, set the matching `mavenCentral*` / `signingInMemory*` Gradle properties in `local.properties`.
