@@ -15,8 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
-- **Uneven letter spacing with fallback fonts** -- when text was laid out with a font that couldn't be embedded (e.g. the platform default `.SF NS` on macOS or Roboto on Linux servers), the standard-14 Helvetica fallback drew glyphs at its own widths inside the original font's glyph positions, so wider glyphs (like `%`) collided with the following character. Overflowing glyphs are now horizontally compressed to fit the space the layout reserved for them. Output with matched embedded fonts (e.g. the default `InterFontFamily`) is unchanged.
-- `FontResolver` now logs a warning when it falls back to a standard PDF font, with a pointer to `defaultFontFamily = InterFontFamily` for exact output.
+- **Any font now renders with correct letter spacing — automatically.** Text laid out with fonts that previously couldn't be embedded (custom `Font(file)`/`Font(resource)` families, platform defaults like `.SF NS` on macOS or Roboto/DejaVu on Linux servers) was drawn with the non-embedded standard-14 Helvetica, whose different glyph widths made letters randomly squash or collide (e.g. `2.5% ($34.69)` rendering as `2.5%($34.69)`). The renderer now embeds the exact typefaces Compose shaped the text with: fonts loaded during composition are captured from Compose's font stack, system fonts resolve through Skia's own font manager (the same lookup the text shaper uses), and the font bytes are reconstructed from Skia's font-table API for PDFBox subsetting. No API change — existing `InterFontFamily`/bundled behavior is byte-identical.
+- Safety net: if a font still can't be embedded (e.g. a bold instance of a variable-only system font), glyphs wider than the space the layout reserved are horizontally compressed so they can never collide, and `FontResolver` logs a warning naming the family.
 
 ## 1.3.0
 

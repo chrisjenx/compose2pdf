@@ -4,7 +4,9 @@ package com.chrisjenx.compose2pdf.internal
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.InternalComposeUiApi
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
@@ -644,6 +646,9 @@ internal object PdfRenderer {
         config: PdfPageConfig? = null,
         content: @Composable () -> Unit,
     ) {
+        // Expose the composition's font resolver so FontResolver can later embed the exact
+        // typefaces Compose shaped the text with (resource/file fonts, platform defaults).
+        ComposeFontStack.attach(LocalFontFamilyResolver.current)
         CompositionLocalProvider(
             LocalPdfLinkCollector provides linkCollector,
             LocalPdfPageConfig provides config,

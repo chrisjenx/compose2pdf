@@ -45,7 +45,8 @@ internal object FontResolver {
         val families = parseFontFamilyList(family)
         val bold = isBold(weight)
         val italic = isItalic(style)
-        val key = "${families.firstOrNull() ?: "sans-serif"}-$bold-$italic"
+        val weightValue = numericWeight(weight)
+        val key = "${families.firstOrNull() ?: "sans-serif"}-$weightValue-$italic"
 
         fontCache[key]?.let { return it }
 
@@ -61,6 +62,36 @@ internal object FontResolver {
                     logger.warning("Failed to load bundled font '$fam' (bold=$bold, italic=$italic): ${e.message}")
                 }
             }
+        }
+
+        // Typefaces Compose loaded while laying the text out — the exact fonts behind the
+        // SVG's glyph positions (covers resource/file fonts and platform defaults that
+        // never exist as resolvable files on disk).
+        ComposeFontStack.harvest()
+        for (fam in families) {
+            val typeface = TypefaceCaptureRegistry.lookup(fam, weightValue, italic) ?: continue
+            val font = SkiaTypefaceEmbedder.embed(doc, typeface) ?: continue
+            fontCache[key] = font
+            return font
+        }
+
+        // The composition's Skia font collection — the same lookup the paragraph shaper
+        // used for system fonts and glyph-fallback runs.
+        for (fam in families) {
+            val typeface = ComposeFontStack.findTypeface(fam, weightValue, italic, generic = fam in GENERIC_FAMILIES)
+                ?: continue
+            val font = SkiaTypefaceEmbedder.embed(doc, typeface) ?: continue
+            fontCache[key] = font
+            return font
+        }
+
+        // Skia's default font manager — same matcher, for callers that never went through
+        // a Compose composition (e.g. direct SVG conversion).
+        for (fam in families) {
+            val typeface = matchSystemTypeface(fam, weightValue, italic) ?: continue
+            val font = SkiaTypefaceEmbedder.embed(doc, typeface) ?: continue
+            fontCache[key] = font
+            return font
         }
 
         // Try each family in the fallback list (system fonts)
@@ -111,6 +142,34 @@ internal object FontResolver {
 
     private fun isItalic(style: String?): Boolean {
         return style == "italic" || style == "oblique"
+    }
+
+    private fun numericWeight(weight: String?): Int {
+        weight?.toIntOrNull()?.let { return it }
+        return if (isBold(weight)) 700 else 400
+    }
+
+    /**
+     * Resolves [family] through Skia's font manager — the same lookup Skia's text shaper
+     * uses — and verifies the returned typeface actually carries the requested family name
+     * (fontconfig on Linux substitutes a default for unknown families, which would embed
+     * an arbitrary font). Generic families are exempt: whatever the font manager maps them
+     * to IS the font Skia shaped with.
+     */
+    private fun matchSystemTypeface(family: String, weight: Int, italic: Boolean): org.jetbrains.skia.Typeface? {
+        return try {
+            val slant = if (italic) org.jetbrains.skia.FontSlant.ITALIC else org.jetbrains.skia.FontSlant.UPRIGHT
+            val style = org.jetbrains.skia.FontStyle(weight, /* width = */ 5, slant)
+            val typeface = org.jetbrains.skia.FontMgr.default.matchFamilyStyle(family, style) ?: return null
+            val requested = family.trim().lowercase()
+            val isGeneric = requested in GENERIC_FAMILIES
+            val nameMatches = typeface.familyName?.trim()?.lowercase() == requested ||
+                typeface.familyNames.any { it.name.trim().lowercase() == requested }
+            if (isGeneric || nameMatches) typeface else null
+        } catch (t: Throwable) {
+            logger.fine("Skia font manager lookup failed for '$family': ${t.message}")
+            null
+        }
     }
 
     private fun resolveFile(family: String, bold: Boolean, italic: Boolean): File? {
