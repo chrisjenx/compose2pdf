@@ -601,7 +601,6 @@ internal object PdfRenderer {
 
         val pdfDoc = PDDocument()
         val fontCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
-        val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
         val pageLayout = PageLayout.from(config)
         for (pageIndex in 0 until pageCount) {
             val linkCollector = PdfLinkCollector()
@@ -610,6 +609,10 @@ internal object PdfRenderer {
                     content(pageIndex)
                 }
             }
+            // Each page is rendered as its own separate SVG document, and Skia's SVGCanvas
+            // restarts element ids (e.g. `img0`) from zero per document — so the image cache
+            // must be per-page too, or page N could wrongly resolve to page N-1's image.
+            val imageCache = mutableMapOf<String, org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject>()
             SvgToPdfConverter.addPage(pdfDoc, svg, pageLayout, density.density, fontCache, imageCache)
             addLinkAnnotations(pdfDoc.getPage(pageIndex), config, linkCollector.links)
         }

@@ -45,7 +45,10 @@ class Compose2PdfException(message: String, cause: Throwable? = null) : RuntimeE
  *   + band height + a 10pt gap) fits within the margin; a band too tall for its margin
  *   pushes the body down to fit. Inside the body, [LocalPdfPageConfig] reflects this
  *   effective content area — identical to the configured margins unless a band overflows
- *   them.
+ *   them. Its rendered image content should also stay stable across pages: images are
+ *   deduped by element id within the slot, so a slot that draws a DIFFERENT image at the
+ *   same size on different pages will reuse the first page's image (text that varies per
+ *   page, like page numbers, is unaffected).
  * @param footer Optional composable stamped at the bottom of every page, anchored the same
  *   ~18pt from the bottom edge. Same rules as [header].
  * @param content The composable content to render.
@@ -110,7 +113,10 @@ fun renderToPdf(
  *   + band height + a 10pt gap) fits within the margin; a band too tall for its margin
  *   pushes the body down to fit. Inside the body, [LocalPdfPageConfig] reflects this
  *   effective content area — identical to the configured margins unless a band overflows
- *   them.
+ *   them. Its rendered image content should also stay stable across pages: images are
+ *   deduped by element id within the slot, so a slot that draws a DIFFERENT image at the
+ *   same size on different pages will reuse the first page's image (text that varies per
+ *   page, like page numbers, is unaffected).
  * @param footer Optional composable stamped at the bottom of every page, anchored the same
  *   ~18pt from the bottom edge. Same rules as [header].
  * @param content The composable content to render.
