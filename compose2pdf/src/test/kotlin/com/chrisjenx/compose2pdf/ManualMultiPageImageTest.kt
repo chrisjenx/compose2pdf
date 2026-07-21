@@ -8,9 +8,6 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.rendering.PDFRenderer
 import java.awt.Color
-import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
-import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import org.jetbrains.skia.Image as SkiaImage
@@ -31,23 +28,6 @@ import org.jetbrains.skia.Image as SkiaImage
  * red one.
  */
 class ManualMultiPageImageTest {
-
-    private fun solidColorPngBytes(color: Color, size: Int = 40): ByteArray {
-        val image = BufferedImage(size, size, BufferedImage.TYPE_INT_RGB)
-        val g = image.createGraphics()
-        g.color = color
-        g.fillRect(0, 0, size, size)
-        g.dispose()
-        val out = ByteArrayOutputStream()
-        ImageIO.write(image, "png", out)
-        return out.toByteArray()
-    }
-
-    private fun Int.isRed() =
-        ((this shr 16) and 0xFF) > 200 && ((this shr 8) and 0xFF) < 80 && (this and 0xFF) < 80
-
-    private fun Int.isBlue() =
-        (this and 0xFF) > 200 && ((this shr 16) and 0xFF) < 80 && ((this shr 8) and 0xFF) < 80
 
     @Test
     fun `manual multi-page vector render does not share images across pages`() {

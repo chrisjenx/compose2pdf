@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.apache.pdfbox.Loader
-import org.apache.pdfbox.rendering.PDFRenderer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,17 +21,8 @@ class HeaderFooterRasterTest {
     private val config = PdfPageConfig.A4WithMargins
     private val mode = RenderMode.RASTER
 
-    private fun pagePixel(bytes: ByteArray, pageIndex: Int, y: Int): Int {
-        Loader.loadPDF(bytes).use { doc ->
-            val img = PDFRenderer(doc).renderImageWithDPI(pageIndex, 72f)
-            val x = (config.margins.left.value + config.contentWidth.value / 2).toInt()
-            return img.getRGB(x, y)
-        }
-    }
-
-    private fun Int.isRed() = ((this shr 16) and 0xFF) > 200 && ((this shr 8) and 0xFF) < 80
-    private fun Int.isBlue() = (this and 0xFF) > 200 && ((this shr 16) and 0xFF) < 80
-    private fun Int.isGray() = ((this shr 16) and 0xFF) in 120..200
+    private fun pagePixel(bytes: ByteArray, pageIndex: Int, y: Int): Int =
+        pagePixel(bytes, pageIndex, y, config)
 
     private val redHeader: @Composable (PdfPageInfo) -> Unit = {
         Box(Modifier.fillMaxWidth().height(40.dp).background(Color.Red))

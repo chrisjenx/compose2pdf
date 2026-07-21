@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import org.apache.pdfbox.Loader
-import org.apache.pdfbox.rendering.PDFRenderer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,16 +28,8 @@ class HeaderFooterVectorTest {
     // [72, 770]pt since the bands (edge inset + band height + gap) fit within the 72pt margins:
     // header band: [18, 58] (40dp header, 18pt inset from the top edge) — sample y=38
     // footer band: [794, 824] (30dp footer, 18pt inset from the bottom edge) — sample y=809
-    private fun pagePixel(bytes: ByteArray, pageIndex: Int, y: Int): Int {
-        Loader.loadPDF(bytes).use { doc ->
-            val img = PDFRenderer(doc).renderImageWithDPI(pageIndex, 72f)
-            val x = (config.margins.left.value + config.contentWidth.value / 2).toInt()
-            return img.getRGB(x, y)
-        }
-    }
-
-    private fun Int.isRed() = ((this shr 16) and 0xFF) > 200 && ((this shr 8) and 0xFF) < 80
-    private fun Int.isBlue() = (this and 0xFF) > 200 && ((this shr 16) and 0xFF) < 80
+    private fun pagePixel(bytes: ByteArray, pageIndex: Int, y: Int): Int =
+        pagePixel(bytes, pageIndex, y, config)
 
     private val redHeader: @Composable (PdfPageInfo) -> Unit = {
         Box(Modifier.fillMaxWidth().height(40.dp).background(Color.Red))
