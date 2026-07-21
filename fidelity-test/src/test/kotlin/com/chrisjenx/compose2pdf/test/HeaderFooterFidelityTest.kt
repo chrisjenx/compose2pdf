@@ -75,11 +75,11 @@ class HeaderFooterFidelityTest {
                     val img = rasterizePdf(doc, renderDpi, page = i)
                     saveImage(img, imagesDir, "header-footer-$modeName-p$i.png")
 
-                    // Bands now sit within the page margins rather than being added on top of
+                    // Bands sit within the page margins rather than being added on top of
                     // them, so their exact offset depends on band height. Scan the whole top
                     // margin band (rows above the 72pt body-top line, i.e. y in [0, 144) at
                     // 144 DPI) and the whole bottom margin band (rows below the 72pt body-bottom
-                    // line) for any non-whitish ink, instead of hardcoding an exact sample point.
+                    // line) for any non-whitish ink, as a coarse presence check.
                     val xMid = img.width / 2
                     assertTrue(
                         img.hasInkInRows(xMid, 0, 144),
@@ -88,6 +88,28 @@ class HeaderFooterFidelityTest {
                     assertTrue(
                         img.hasInkInRows(xMid, img.height - 144, img.height),
                         "$mode page $i: footer band should be drawn in the bottom margin",
+                    )
+
+                    // Presence alone would pass even if a band were mispositioned anywhere in
+                    // the margin, so also assert ink at the actual EDGE-ANCHORED position: the
+                    // header band's top is SLOT_EDGE_INSET_PT (18pt) from the page top, and the
+                    // footer band's bottom is 18pt from the page bottom. At this test's 144 DPI
+                    // (density 2 -> 1pt = 2px), sample 6pt INTO each band from its anchored
+                    // edge (robust for any band >= ~8pt tall) rather than at the edge itself,
+                    // where anti-aliasing could produce a false negative.
+                    val edgeInsetPx = 18 * 2
+                    val sampleIntoPx = 6 * 2
+                    val headerSampleY = edgeInsetPx + sampleIntoPx
+                    val footerSampleY = img.height - edgeInsetPx - sampleIntoPx
+                    assertTrue(
+                        !img.isWhitishAt(xMid, headerSampleY),
+                        "$mode page $i: header band should have ink at its anchored position (y=$headerSampleY, " +
+                            "${18 + 6}pt from the top edge)",
+                    )
+                    assertTrue(
+                        !img.isWhitishAt(xMid, footerSampleY),
+                        "$mode page $i: footer band should have ink at its anchored position (y=$footerSampleY, " +
+                            "${18 + 6}pt from the bottom edge)",
                     )
                 }
             }
