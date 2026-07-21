@@ -87,6 +87,9 @@ Text(
 
 ## Fonts
 
+![Custom fonts example]({{ site.baseurl }}/assets/images/14-custom-fonts.png){: .rounded .shadow .mb-4 }
+*Custom fonts example (Montserrat via `Font(resource)`, bundled Inter, generic families) — [download PDF]({{ site.baseurl }}/assets/pdfs/14-custom-fonts.pdf), source: [`14_CustomFonts.kt`](https://github.com/chrisjenx/compose2pdf/blob/main/examples/src/main/kotlin/com/chrisjenx/compose2pdf/examples/14_CustomFonts.kt)*
+
 ### Default: InterFontFamily
 
 By default, `renderToPdf` uses `InterFontFamily` -- a bundled set of static Inter fonts:

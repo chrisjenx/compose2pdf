@@ -136,6 +136,18 @@ class FontResolverTest {
         PDDocument().use { doc ->
             val font = FontResolver.resolve(doc, mutableMapOf(), "Inter", "bold", null)
             assertIs<PDType0Font>(font)
+            assertTrue(font.name.contains("Bold"), "expected Inter-Bold, got ${font.name}")
+        }
+    }
+
+    @Test
+    fun `Skia-quantized weight 600 resolves the bold face`() {
+        // Skia's SVG writer emits font-weight="600" for typefaces whose OS/2 weight is
+        // 700 (e.g. Inter-Bold), so 600 must select the bold variant.
+        PDDocument().use { doc ->
+            val font = FontResolver.resolve(doc, mutableMapOf(), "Inter", "600", null)
+            assertIs<PDType0Font>(font)
+            assertTrue(font.name.contains("Bold"), "expected Inter-Bold, got ${font.name}")
         }
     }
 

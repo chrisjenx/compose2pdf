@@ -36,6 +36,7 @@ fun main() {
         ::autoPagination,
         ::paginatedColumnExample,
         ::headerFooter,
+        ::customFonts,
     )
 
     val outputs = mutableListOf<ExampleOutput>()

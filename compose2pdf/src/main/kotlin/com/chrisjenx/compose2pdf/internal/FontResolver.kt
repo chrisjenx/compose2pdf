@@ -136,7 +136,10 @@ internal object FontResolver {
 
     private fun isBold(weight: String?): Boolean {
         if (weight == null) return false
-        weight.toIntOrNull()?.let { return it >= 700 }
+        // Skia's SVG writer quantizes typeface weights down a CSS bucket (Inter-Bold's
+        // OS/2 weight of 700 is emitted as font-weight="600"), and Compose's own font
+        // matching resolves 600+ to the bold face — so treat >= 600 as bold.
+        weight.toIntOrNull()?.let { return it >= 600 }
         return weight == "bold" || weight == "bolder"
     }
 
