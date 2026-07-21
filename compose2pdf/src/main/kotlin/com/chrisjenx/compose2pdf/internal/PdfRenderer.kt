@@ -82,7 +82,12 @@ internal object PdfRenderer {
         }
     }
 
-    /** Measured header/footer bands plus the page config with margins inflated by them. */
+    /**
+     * Measured header/footer bands plus the effective page config for the body.
+     * Each effective margin is `max(configured margin, SLOT_EDGE_INSET_PT + band height +
+     * SLOT_BODY_GAP_PT)` — equal to the configured margin when the band fits within it, and
+     * larger only when the band + inset + gap exceeds the configured margin.
+     */
     internal class SlotBands(
         val headerPx: Int,
         val footerPx: Int,
