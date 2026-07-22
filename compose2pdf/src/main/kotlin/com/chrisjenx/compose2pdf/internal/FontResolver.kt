@@ -43,70 +43,57 @@ internal object FontResolver {
         style: String?,
     ): PDFont {
         val families = parseFontFamilyList(family)
-        val bold = isBold(weight)
-        val italic = isItalic(style)
         val weightValue = numericWeight(weight)
+        val bold = weightValue >= BOLD_THRESHOLD
+        val italic = isItalic(style)
         val key = "${families.firstOrNull() ?: "sans-serif"}-$weightValue-$italic"
 
         fontCache[key]?.let { return it }
 
-        // Try bundled fonts first (guaranteed to match Compose rendering)
+        // 1. Bundled fonts first (guaranteed to match Compose rendering).
         for (fam in families) {
-            val resourcePath = bundledFontPath(fam, bold, italic) ?: continue
-            // Dedup by resource path: distinct weight/style keys collapsing to the same
-            // bundled file (e.g. Bold and ExtraBold both map to Inter-Bold) share one embed.
-            val cached = fontCache[resourcePath]
-            if (cached != null) {
-                fontCache[key] = cached
-                return cached
-            }
-            val stream = Thread.currentThread().contextClassLoader?.getResourceAsStream(resourcePath) ?: continue
-            try {
-                val font = stream.use { PDType0Font.load(doc, it) }
-                fontCache[resourcePath] = font
-                fontCache[key] = font
-                return font
-            } catch (e: Exception) {
-                logger.warning("Failed to load bundled font '$fam' (bold=$bold, italic=$italic): ${e.message}")
-            }
+            val path = bundledFontPath(fam, bold, italic) ?: continue
+            loadOrReuse(fontCache, key, "bundled:$path") {
+                Thread.currentThread().contextClassLoader?.getResourceAsStream(path)?.use { stream ->
+                    try {
+                        PDType0Font.load(doc, stream)
+                    } catch (e: Exception) {
+                        logger.warning("Failed to load bundled font '$fam' (bold=$bold, italic=$italic): ${e.message}")
+                        null
+                    }
+                }
+            }?.let { return it }
         }
 
-        // Typefaces Compose loaded while laying the text out — the exact fonts behind the
-        // SVG's glyph positions (covers resource/file fonts and platform defaults that never
-        // exist as resolvable files on disk), then the composition's Skia FontCollection (the
-        // paragraph shaper's own lookup for system fonts and glyph-fallback runs), then Skia's
-        // default font manager (for callers that never went through a Compose composition).
-        val typefaceSources = listOf<(String) -> org.jetbrains.skia.Typeface?>(
-            { fam -> ComposeFontStack.lookupCaptured(fam, weightValue, italic) },
-            { fam -> ComposeFontStack.findTypeface(fam, weightValue, italic, generic = fam in GENERIC_FAMILIES) },
-            { fam -> matchSystemTypeface(fam, weightValue, italic) },
-        )
-        for (source in typefaceSources) {
-            for (fam in families) {
-                val typeface = source(fam) ?: continue
-                val font = embedTypeface(doc, fontCache, typeface) ?: continue
-                fontCache[key] = font
-                return font
-            }
+        // 2. Typefaces the current render loaded — the exact fonts behind the SVG's glyph
+        //    positions (resource/file fonts, platform defaults that aren't resolvable files).
+        for (fam in families) {
+            val typeface = ComposeFontStack.lookupCaptured(fam, weightValue, italic) ?: continue
+            embedTypeface(doc, fontCache, key, typeface)?.let { return it }
+        }
+        // 3. The composition's Skia FontCollection — the shaper's own system/glyph-fallback lookup.
+        for (fam in families) {
+            val typeface = ComposeFontStack.findTypeface(fam, weightValue, italic, fam in GENERIC_FAMILIES) ?: continue
+            embedTypeface(doc, fontCache, key, typeface)?.let { return it }
+        }
+        // 4. Skia's default font manager — for callers that never went through a composition.
+        for (fam in families) {
+            val typeface = ComposeFontStack.matchSystemTypeface(fam, weightValue, italic, fam in GENERIC_FAMILIES) ?: continue
+            embedTypeface(doc, fontCache, key, typeface)?.let { return it }
         }
 
-        // Try each family in the fallback list (system fonts)
+        // 5. A same-named font on the filesystem.
         for (fam in families) {
             if (fam in GENERIC_FAMILIES) continue
             val fontFile = resolveFile(fam, bold, italic) ?: continue
-            // Dedup by file path: distinct weight/style keys that collapse to the same
-            // fallback file (isBold/isItalic are coarse) must not embed it twice per document.
-            val fileKey = "file:${fontFile.path}"
-            val font = fontCache[fileKey] ?: try {
-                PDType0Font.load(doc, fontFile).also { fontCache[fileKey] = it }
-            } catch (e: Exception) {
-                logger.fine("Failed to load system font '$fam' from ${fontFile.path}: ${e.message}")
-                null
-            }
-            if (font != null) {
-                fontCache[key] = font
-                return font
-            }
+            loadOrReuse(fontCache, key, "file:${fontFile.path}") {
+                try {
+                    PDType0Font.load(doc, fontFile)
+                } catch (e: Exception) {
+                    logger.fine("Failed to load system font '$fam' from ${fontFile.path}: ${e.message}")
+                    null
+                }
+            }?.let { return it }
         }
 
         // Fall back to standard PDF fonts
@@ -125,19 +112,31 @@ internal object FontResolver {
     }
 
     /**
-     * Embeds [typeface], reusing an already-embedded copy in this document. Distinct
-     * weight/style cache keys can resolve to the same physical typeface (e.g. FontWeight.Bold
-     * and ExtraBold both nearest-match one bold face); without this dedup each would load a
-     * separate subset of the identical font and inflate the PDF.
+     * Loads a font once per document and reuses it. [identityKey] namespaces the physical
+     * source (bundled resource, file path, Skia typeface id) so distinct resolution keys that
+     * map to the same font don't each embed a duplicate subset; [resolutionKey] is the
+     * family/weight/style lookup key, aliased to the same instance on success. Returns null
+     * (embedding nothing) when [load] yields null.
      */
+    private inline fun loadOrReuse(
+        fontCache: MutableMap<String, PDFont>,
+        resolutionKey: String,
+        identityKey: String,
+        load: () -> PDFont?,
+    ): PDFont? {
+        val font = fontCache[identityKey] ?: load()?.also { fontCache[identityKey] = it } ?: return null
+        fontCache[resolutionKey] = font
+        return font
+    }
+
+    /** Embeds [typeface] via [loadOrReuse], deduped per document by its Skia uniqueId. */
     private fun embedTypeface(
         doc: PDDocument,
         fontCache: MutableMap<String, PDFont>,
+        resolutionKey: String,
         typeface: org.jetbrains.skia.Typeface,
-    ): PDFont? {
-        val embedKey = "typeface:${typeface.uniqueId}"
-        fontCache[embedKey]?.let { return it }
-        return SkiaTypefaceEmbedder.embed(doc, typeface)?.also { fontCache[embedKey] = it }
+    ): PDFont? = loadOrReuse(fontCache, resolutionKey, "typeface:${typeface.uniqueId}") {
+        SkiaTypefaceEmbedder.embed(doc, typeface)
     }
 
     // Families already warned about falling back to a standard-14 font (avoid log spam)
@@ -150,12 +149,14 @@ internal object FontResolver {
             .filter { it.isNotEmpty() }
     }
 
+    // Skia's SVG writer quantizes typeface weights down a CSS bucket (Inter-Bold's OS/2
+    // weight of 700 is emitted as font-weight="600"), and Compose's own font matching
+    // resolves 600+ to the bold face — so treat >= 600 as bold.
+    private const val BOLD_THRESHOLD = 600
+
     private fun isBold(weight: String?): Boolean {
         if (weight == null) return false
-        // Skia's SVG writer quantizes typeface weights down a CSS bucket (Inter-Bold's
-        // OS/2 weight of 700 is emitted as font-weight="600"), and Compose's own font
-        // matching resolves 600+ to the bold face — so treat >= 600 as bold.
-        weight.toIntOrNull()?.let { return it >= 600 }
+        weight.toIntOrNull()?.let { return it >= BOLD_THRESHOLD }
         return weight == "bold" || weight == "bolder"
     }
 
@@ -168,28 +169,6 @@ internal object FontResolver {
         return if (isBold(weight)) 700 else 400
     }
 
-    /**
-     * Resolves [family] through Skia's font manager — the same lookup Skia's text shaper
-     * uses — and verifies the returned typeface actually carries the requested family name
-     * (fontconfig on Linux substitutes a default for unknown families, which would embed
-     * an arbitrary font). Generic families are exempt: whatever the font manager maps them
-     * to IS the font Skia shaped with.
-     */
-    private fun matchSystemTypeface(family: String, weight: Int, italic: Boolean): org.jetbrains.skia.Typeface? {
-        return try {
-            val slant = if (italic) org.jetbrains.skia.FontSlant.ITALIC else org.jetbrains.skia.FontSlant.UPRIGHT
-            val style = org.jetbrains.skia.FontStyle(weight, /* width = */ 5, slant)
-            val typeface = org.jetbrains.skia.FontMgr.default.matchFamilyStyle(family, style) ?: return null
-            val requested = family.trim().lowercase()
-            val isGeneric = requested in GENERIC_FAMILIES
-            val nameMatches = typeface.familyName?.trim()?.lowercase() == requested ||
-                typeface.familyNames.any { it.name.trim().lowercase() == requested }
-            if (isGeneric || nameMatches) typeface else null
-        } catch (t: Throwable) {
-            logger.fine("Skia font manager lookup failed for '$family': ${t.message}")
-            null
-        }
-    }
 
     private fun resolveFile(family: String, bold: Boolean, italic: Boolean): File? {
         val cacheKey = "$family-$bold-$italic"
