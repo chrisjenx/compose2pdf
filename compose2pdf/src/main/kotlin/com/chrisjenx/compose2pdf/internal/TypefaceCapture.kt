@@ -5,66 +5,30 @@ import org.jetbrains.skia.FontSlant
 import org.jetbrains.skia.FontStyle
 import org.jetbrains.skia.Typeface
 import org.jetbrains.skia.paragraph.FontCollection
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedDeque
-import java.util.concurrent.CopyOnWriteArrayList
+import java.lang.ref.WeakReference
+import java.util.Collections
+import java.util.WeakHashMap
+import kotlin.math.abs
 
 /**
- * Process-wide registry of the exact Skia [Typeface]s Compose resolved while laying text out.
+ * Bridges Compose's font stack to [FontResolver] so the PDF embeds the exact typefaces the
+ * composition shaped the text with.
  *
- * Skia's SVG output only carries font *names*, which is lossy: fonts loaded from Compose
+ * Skia's SVG output carries only font *names*, which is lossy: fonts loaded from Compose
  * resources/files aren't installed on the system, and platform defaults (".SF NS", "Roboto")
- * resolve through Skia's font manager rather than the filesystem. Recording the shaping
- * typefaces lets [FontResolver] embed the very fonts that produced the glyph positions, so
- * PDF output matches the layout for ANY font — no filename heuristics involved.
+ * resolve through Skia's font manager rather than the filesystem. PdfRenderer [attach]es the
+ * composition's `LocalFontFamilyResolver` while rendering; FontResolver then [lookupCaptured]s
+ * the typefaces Compose actually loaded (resource/file fonts live only in the resolver's
+ * internal FontCache, registered under opaque cache keys rather than their family names) and
+ * can [findTypeface] through the same Skia [FontCollection] the paragraph shaper used for
+ * system lookups.
  *
- * Process-wide by design (like FontResolver's file path cache): a family name maps to the
- * same typeface for every render in this JVM.
- */
-internal object TypefaceCaptureRegistry {
-
-    internal data class Entry(val weight: Int, val italic: Boolean, val typeface: Typeface)
-
-    private val byFamily = ConcurrentHashMap<String, CopyOnWriteArrayList<Entry>>()
-
-    fun record(typeface: Typeface) {
-        val style = typeface.fontStyle
-        val entry = Entry(
-            weight = style.weight,
-            italic = style.slant != FontSlant.UPRIGHT,
-            typeface = typeface,
-        )
-        val names = buildSet {
-            add(typeface.familyName)
-            typeface.familyNames.forEach { add(it.name) }
-        }
-        for (name in names) {
-            val key = name.trim().lowercase()
-            if (key.isEmpty()) continue
-            val entries = byFamily.getOrPut(key) { CopyOnWriteArrayList() }
-            if (entries.none { it.typeface.uniqueId == typeface.uniqueId }) entries.add(entry)
-        }
-    }
-
-    /** Best captured typeface for [family], preferring exact italic match then nearest weight. */
-    fun lookup(family: String, weight: Int, italic: Boolean): Typeface? {
-        val entries = byFamily[family.trim().lowercase()] ?: return null
-        val candidates = entries.filter { it.italic == italic }.ifEmpty { entries }
-        return candidates.minByOrNull { kotlin.math.abs(it.weight - weight) }?.typeface
-    }
-
-    /** Test hook — capture is process-global, so tests may need a clean slate. */
-    fun clear() = byFamily.clear()
-}
-
-/**
- * Bridges Compose's font stack to [FontResolver].
- *
- * PdfRenderer [attach]es the composition's `LocalFontFamilyResolver` while rendering; on a
- * font-cache miss FontResolver then [harvest]s every typeface Compose loaded (resource/file
- * fonts live only in the resolver's internal FontCache — they're registered in Skia's
- * font collection under opaque cache keys, not their family names) and can [findTypeface]
- * through the same Skia [FontCollection] the paragraph shaper used for system lookups.
+ * Capture is scoped to the render in flight, not accumulated for the JVM lifetime: only the
+ * current resolver is held strongly (so its FontCache survives from composition to the later
+ * SVG→PDF conversion), while resolvers from earlier renders are held weakly so their font
+ * data is released once their render completes — and so a typeface a *previous* render loaded
+ * under a family name can never shadow a *different* font the current render loaded under the
+ * same name.
  *
  * The resolver's loader/cache types are Compose-internal, so the walk is reflective and
  * strictly best-effort: any failure (including a future Compose version reshaping these
@@ -75,51 +39,76 @@ internal object ComposeFontStack {
 
     private val logger = java.util.logging.Logger.getLogger(ComposeFontStack::class.java.name)
 
-    // Most recent resolvers (scenes may create a fresh resolver per render); newest first.
-    private val resolvers = ConcurrentLinkedDeque<FontFamily.Resolver>()
+    private val lock = Any()
+    // The resolver for the render currently in flight — held strongly so its FontCache
+    // (with resource/file typefaces) stays alive between composition and PDF conversion.
+    private var current: FontFamily.Resolver? = null
+    // Resolvers from earlier renders, weakly held so their font caches can be collected.
+    private val previous = ArrayDeque<WeakReference<FontFamily.Resolver>>()
+
+    // Typefaces harvested from each resolver's FontCache, memoized so repeated cache-miss
+    // lookups within one render don't re-run reflection. WeakHashMap keys → the list is
+    // released together with its resolver.
+    private val harvested = Collections.synchronizedMap(WeakHashMap<FontFamily.Resolver, List<Typeface>>())
+
     @Volatile private var warned = false
 
     fun attach(resolver: FontFamily.Resolver) {
-        if (resolvers.peekFirst() === resolver) return
-        resolvers.remove(resolver)
-        resolvers.addFirst(resolver)
-        while (resolvers.size > 4) resolvers.pollLast()
+        synchronized(lock) {
+            if (current === resolver) return
+            current?.let {
+                previous.addFirst(WeakReference(it))
+                while (previous.size > MAX_PREVIOUS) previous.removeLast()
+            }
+            current = resolver
+        }
     }
 
-    /** Records every typeface Compose has loaded so far into [TypefaceCaptureRegistry]. */
-    fun harvest() {
-        for (resolver in resolvers) {
-            try {
-                val fontCache = fontCacheOf(resolver) ?: continue
-                val typefacesCache = fontCache.javaClass.getDeclaredField("typefacesCache")
-                    .apply { isAccessible = true }.get(fontCache) ?: continue
-                val map = typefacesCache.javaClass.methods
-                    .firstOrNull { it.name == "getMap\$ui_text" }?.invoke(typefacesCache) as? Map<*, *>
-                    ?: continue
-                map.values.filterIsInstance<Typeface>().forEach(TypefaceCaptureRegistry::record)
-            } catch (t: Throwable) {
-                warnOnce(t)
+    /** Current + still-live earlier resolvers, current first; prunes collected weak refs. */
+    private fun liveResolvers(): List<FontFamily.Resolver> = synchronized(lock) {
+        buildList {
+            current?.let { add(it) }
+            val it = previous.iterator()
+            while (it.hasNext()) {
+                val r = it.next().get()
+                if (r == null) it.remove() else add(r)
             }
         }
+    }
+
+    /**
+     * Best typeface Compose loaded for [family], preferring the current render's resolver,
+     * then exact italic match, then nearest weight. Covers resource/file fonts that exist
+     * only in the FontCache under opaque keys, so a plain family-name query can't find them.
+     */
+    fun lookupCaptured(family: String, weight: Int, italic: Boolean): Typeface? {
+        val requested = family.trim().lowercase()
+        for (resolver in liveResolvers()) {
+            val matches = typefacesOf(resolver).filter { nameMatches(it, requested) }
+            if (matches.isEmpty()) continue
+            val candidates = matches
+                .filter { (it.fontStyle.slant != FontSlant.UPRIGHT) == italic }
+                .ifEmpty { matches }
+            return candidates.minByOrNull { abs(it.fontStyle.weight - weight) }
+        }
+        return null
     }
 
     /**
      * Resolves [family] through the composition's Skia [FontCollection] — the same lookup
      * the paragraph shaper used. The result is verified to actually carry the requested
      * family name (fallback managers substitute a default for unknown families) unless a
-     * generic family was requested, where the substitution IS the shaping font.
+     * generic family was requested, where the substitution IS the font Skia shaped with.
      */
     fun findTypeface(family: String, weight: Int, italic: Boolean, generic: Boolean): Typeface? {
+        val requested = family.trim().lowercase()
         val slant = if (italic) FontSlant.ITALIC else FontSlant.UPRIGHT
         val style = FontStyle(weight, /* width = */ 5, slant)
-        for (resolver in resolvers) {
+        for (resolver in liveResolvers()) {
             try {
-                val fontCache = fontCacheOf(resolver) ?: continue
-                val collection = fontCache.javaClass.methods
-                    .firstOrNull { it.name == "getFonts\$ui_text" }?.invoke(fontCache) as? FontCollection
-                    ?: continue
+                val collection = fontCollectionOf(resolver) ?: continue
                 val typeface = collection.findTypefaces(arrayOf(family), style).firstOrNull() ?: continue
-                if (generic || nameMatches(typeface, family)) return typeface
+                if (generic || nameMatches(typeface, requested)) return typeface
             } catch (t: Throwable) {
                 warnOnce(t)
             }
@@ -127,20 +116,40 @@ internal object ComposeFontStack {
         return null
     }
 
+    /** Typefaces in [resolver]'s FontCache, harvested reflectively once and memoized. */
+    private fun typefacesOf(resolver: FontFamily.Resolver): List<Typeface> =
+        harvested.getOrPut(resolver) {
+            try {
+                val fontCache = fontCacheOf(resolver) ?: return@getOrPut emptyList()
+                val typefacesCache = fontCache.javaClass.getDeclaredField("typefacesCache")
+                    .apply { isAccessible = true }.get(fontCache) ?: return@getOrPut emptyList()
+                val map = typefacesCache.javaClass.methods
+                    .firstOrNull { it.name == "getMap\$ui_text" }?.invoke(typefacesCache) as? Map<*, *>
+                    ?: return@getOrPut emptyList()
+                map.values.filterIsInstance<Typeface>().toList()
+            } catch (t: Throwable) {
+                warnOnce(t)
+                emptyList()
+            }
+        }
+
+    private fun fontCollectionOf(resolver: FontFamily.Resolver): FontCollection? {
+        val fontCache = fontCacheOf(resolver) ?: return null
+        return fontCache.javaClass.methods
+            .firstOrNull { it.name == "getFonts\$ui_text" }?.invoke(fontCache) as? FontCollection
+    }
+
     private fun fontCacheOf(resolver: FontFamily.Resolver): Any? {
         val loader = resolver.javaClass.methods
             .firstOrNull { it.name == "getPlatformFontLoader\$ui_text" }?.invoke(resolver)
             ?: return null
-        val getFontCache = loader.javaClass.getDeclaredMethod("getFontCache")
-            .apply { isAccessible = true }
-        return getFontCache.invoke(loader)
+        return loader.javaClass.getDeclaredMethod("getFontCache")
+            .apply { isAccessible = true }.invoke(loader)
     }
 
-    private fun nameMatches(typeface: Typeface, family: String): Boolean {
-        val requested = family.trim().lowercase()
-        return typeface.familyName.trim().lowercase() == requested ||
-            typeface.familyNames.any { it.name.trim().lowercase() == requested }
-    }
+    private fun nameMatches(typeface: Typeface, requestedLower: String): Boolean =
+        typeface.familyName.trim().lowercase() == requestedLower ||
+            typeface.familyNames.any { it.name.trim().lowercase() == requestedLower }
 
     private fun warnOnce(t: Throwable) {
         if (!warned) {
@@ -149,6 +158,14 @@ internal object ComposeFontStack {
         }
     }
 
-    /** Test hook. */
-    fun clear() = resolvers.clear()
+    /** Test hook — capture is process-scoped, so tests may need a clean slate. */
+    fun clear() {
+        synchronized(lock) {
+            current = null
+            previous.clear()
+        }
+        harvested.clear()
+    }
+
+    private const val MAX_PREVIOUS = 3
 }

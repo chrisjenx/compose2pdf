@@ -428,7 +428,10 @@ internal object SvgToPdfConverter {
             }
             // Small tolerance so float noise doesn't emit needless Tz operators
             if (naturalWidth <= slotWidth + fontSize * 0.01f) return 100f
-            return (slotWidth / naturalWidth * 100f).coerceAtLeast(50f)
+            // Compress to exactly fill the slot — no floor, or a glyph much wider than its
+            // slot would still overrun and collide with the next one (the very thing this
+            // guards against). coerceAtLeast(1f) only rules out a degenerate zero scale.
+            return (slotWidth / naturalWidth * 100f).coerceAtLeast(1f)
         }
 
         private fun renderGroup(elem: Element) {

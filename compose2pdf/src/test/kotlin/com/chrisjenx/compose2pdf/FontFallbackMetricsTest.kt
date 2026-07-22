@@ -35,6 +35,27 @@ class FontFallbackMetricsTest {
     }
 
     @Test
+    fun `a very wide glyph in a tight slot is compressed below 50 percent to avoid collision`() {
+        // 'W' at font-size 40 in Helvetica is 0.944em = 37.76pt wide, but the layout only
+        // reserves a 12pt slot before the next glyph. The compression must shrink it to fit
+        // (~32%), not floor at 50% — a 50% floor would leave it ~18.9pt, overrunning the slot.
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="300" height="60">
+            <text x="10.0, 22.0, 34.0" y="40" font-size="40"
+                  font-family="NoSuchFontFamilyXyz">WWW</text>
+        </svg>"""
+        PDDocument().use { doc ->
+            SvgToPdfConverter.addPage(doc, svg, PageLayout.full(300f, 60f), density = 1f)
+            val tz = horizontalScalingOps(doc.getPage(0))
+            assertTrue(
+                tz.any { it < 50f },
+                "Expected a Tz below 50% so the wide glyph fits its slot, got $tz",
+            )
+            // slot 12pt / natural 37.76pt ≈ 32%
+            assertTrue(tz.any { it in 28f..36f }, "Expected 'W' compressed to ~32%, got $tz")
+        }
+    }
+
+    @Test
     fun `fallback font compresses glyphs wider than their shaping slot`() {
         // x positions simulate Roboto advances at 19.5pt: '%' slot is 14.28pt but
         // standard-14 Helvetica draws '%' at 0.889em = 17.33pt — must be compressed.

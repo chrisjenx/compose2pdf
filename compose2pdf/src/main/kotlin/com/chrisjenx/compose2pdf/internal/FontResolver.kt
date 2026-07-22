@@ -52,60 +52,60 @@ internal object FontResolver {
 
         // Try bundled fonts first (guaranteed to match Compose rendering)
         for (fam in families) {
-            val bundledStream = resolveBundledFont(fam, bold, italic)
-            if (bundledStream != null) {
-                try {
-                    val font = bundledStream.use { PDType0Font.load(doc, it) }
-                    fontCache[key] = font
-                    return font
-                } catch (e: Exception) {
-                    logger.warning("Failed to load bundled font '$fam' (bold=$bold, italic=$italic): ${e.message}")
-                }
+            val resourcePath = bundledFontPath(fam, bold, italic) ?: continue
+            // Dedup by resource path: distinct weight/style keys collapsing to the same
+            // bundled file (e.g. Bold and ExtraBold both map to Inter-Bold) share one embed.
+            val cached = fontCache[resourcePath]
+            if (cached != null) {
+                fontCache[key] = cached
+                return cached
+            }
+            val stream = Thread.currentThread().contextClassLoader?.getResourceAsStream(resourcePath) ?: continue
+            try {
+                val font = stream.use { PDType0Font.load(doc, it) }
+                fontCache[resourcePath] = font
+                fontCache[key] = font
+                return font
+            } catch (e: Exception) {
+                logger.warning("Failed to load bundled font '$fam' (bold=$bold, italic=$italic): ${e.message}")
             }
         }
 
         // Typefaces Compose loaded while laying the text out — the exact fonts behind the
-        // SVG's glyph positions (covers resource/file fonts and platform defaults that
-        // never exist as resolvable files on disk).
-        ComposeFontStack.harvest()
-        for (fam in families) {
-            val typeface = TypefaceCaptureRegistry.lookup(fam, weightValue, italic) ?: continue
-            val font = SkiaTypefaceEmbedder.embed(doc, typeface) ?: continue
-            fontCache[key] = font
-            return font
-        }
-
-        // The composition's Skia font collection — the same lookup the paragraph shaper
-        // used for system fonts and glyph-fallback runs.
-        for (fam in families) {
-            val typeface = ComposeFontStack.findTypeface(fam, weightValue, italic, generic = fam in GENERIC_FAMILIES)
-                ?: continue
-            val font = SkiaTypefaceEmbedder.embed(doc, typeface) ?: continue
-            fontCache[key] = font
-            return font
-        }
-
-        // Skia's default font manager — same matcher, for callers that never went through
-        // a Compose composition (e.g. direct SVG conversion).
-        for (fam in families) {
-            val typeface = matchSystemTypeface(fam, weightValue, italic) ?: continue
-            val font = SkiaTypefaceEmbedder.embed(doc, typeface) ?: continue
-            fontCache[key] = font
-            return font
+        // SVG's glyph positions (covers resource/file fonts and platform defaults that never
+        // exist as resolvable files on disk), then the composition's Skia FontCollection (the
+        // paragraph shaper's own lookup for system fonts and glyph-fallback runs), then Skia's
+        // default font manager (for callers that never went through a Compose composition).
+        val typefaceSources = listOf<(String) -> org.jetbrains.skia.Typeface?>(
+            { fam -> ComposeFontStack.lookupCaptured(fam, weightValue, italic) },
+            { fam -> ComposeFontStack.findTypeface(fam, weightValue, italic, generic = fam in GENERIC_FAMILIES) },
+            { fam -> matchSystemTypeface(fam, weightValue, italic) },
+        )
+        for (source in typefaceSources) {
+            for (fam in families) {
+                val typeface = source(fam) ?: continue
+                val font = embedTypeface(doc, fontCache, typeface) ?: continue
+                fontCache[key] = font
+                return font
+            }
         }
 
         // Try each family in the fallback list (system fonts)
         for (fam in families) {
             if (fam in GENERIC_FAMILIES) continue
-            val fontFile = resolveFile(fam, bold, italic)
-            if (fontFile != null) {
-                try {
-                    val font = PDType0Font.load(doc, fontFile)
-                    fontCache[key] = font
-                    return font
-                } catch (e: Exception) {
-                    logger.fine("Failed to load system font '$fam' from ${fontFile.path}: ${e.message}")
-                }
+            val fontFile = resolveFile(fam, bold, italic) ?: continue
+            // Dedup by file path: distinct weight/style keys that collapse to the same
+            // fallback file (isBold/isItalic are coarse) must not embed it twice per document.
+            val fileKey = "file:${fontFile.path}"
+            val font = fontCache[fileKey] ?: try {
+                PDType0Font.load(doc, fontFile).also { fontCache[fileKey] = it }
+            } catch (e: Exception) {
+                logger.fine("Failed to load system font '$fam' from ${fontFile.path}: ${e.message}")
+                null
+            }
+            if (font != null) {
+                fontCache[key] = font
+                return font
             }
         }
 
@@ -122,6 +122,22 @@ internal object FontResolver {
         }
         fontCache[key] = font
         return font
+    }
+
+    /**
+     * Embeds [typeface], reusing an already-embedded copy in this document. Distinct
+     * weight/style cache keys can resolve to the same physical typeface (e.g. FontWeight.Bold
+     * and ExtraBold both nearest-match one bold face); without this dedup each would load a
+     * separate subset of the identical font and inflate the PDF.
+     */
+    private fun embedTypeface(
+        doc: PDDocument,
+        fontCache: MutableMap<String, PDFont>,
+        typeface: org.jetbrains.skia.Typeface,
+    ): PDFont? {
+        val embedKey = "typeface:${typeface.uniqueId}"
+        fontCache[embedKey]?.let { return it }
+        return SkiaTypefaceEmbedder.embed(doc, typeface)?.also { fontCache[embedKey] = it }
     }
 
     // Families already warned about falling back to a standard-14 font (avoid log spam)
@@ -330,10 +346,8 @@ internal object FontResolver {
         Triple("Inter", true, true) to "fonts/Inter-BoldItalic.ttf",
     )
 
-    private fun resolveBundledFont(family: String, bold: Boolean, italic: Boolean): java.io.InputStream? {
-        val resourcePath = BUNDLED_FONTS[Triple(family, bold, italic)] ?: return null
-        return Thread.currentThread().contextClassLoader?.getResourceAsStream(resourcePath)
-    }
+    private fun bundledFontPath(family: String, bold: Boolean, italic: Boolean): String? =
+        BUNDLED_FONTS[Triple(family, bold, italic)]
 
     private val GENERIC_FAMILIES = setOf(
         "sans-serif", "serif", "monospace", "cursive", "fantasy", "system-ui",

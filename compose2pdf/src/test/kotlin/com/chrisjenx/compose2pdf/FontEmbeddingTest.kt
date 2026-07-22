@@ -87,6 +87,58 @@ class FontEmbeddingTest {
     }
 
     @Test
+    fun `two bold-range weights of one family embed the fallback file only once`() {
+        // Bold (700) and ExtraBold (800) both collapse to Inter-Bold. Distinct cache keys
+        // must not each load a separate subset of the identical file into the document.
+        val cache = mutableMapOf<String, org.apache.pdfbox.pdmodel.font.PDFont>()
+        org.apache.pdfbox.pdmodel.PDDocument().use { doc ->
+            val bold = com.chrisjenx.compose2pdf.internal.FontResolver.resolve(doc, cache, "Inter", "700", null)
+            val extraBold = com.chrisjenx.compose2pdf.internal.FontResolver.resolve(doc, cache, "Inter", "800", null)
+            assertTrue(bold.name?.contains("Bold") == true, "expected Inter-Bold, got ${bold.name}")
+            kotlin.test.assertSame(bold, extraBold, "both bold-range weights must share one embedded font")
+        }
+    }
+
+    @Test
+    fun `a second render is not shadowed by a prior render's font of the same family name`() {
+        // Two documents both use family "Zoxca" for physically different fonts (Inter's
+        // Regular vs Bold, renamed). The second render must embed ITS font, not the one the
+        // first render captured under the same family name.
+        val regularAsZoxca = File.createTempFile("c2p-zoxca-reg", ".ttf")
+            .apply { deleteOnExit(); writeBytes(renameFont("fonts/Inter-Regular.ttf", "Zoxca")) }
+        val boldAsZoxca = File.createTempFile("c2p-zoxca-bold", ".ttf")
+            .apply { deleteOnExit(); writeBytes(renameFont("fonts/Inter-Bold.ttf", "Zoxca")) }
+
+        fun render(file: File) = renderToPdf(config = PdfPageConfig.A4WithMargins) {
+            MaterialTheme {
+                Text("Wave WWW", style = TextStyle(fontFamily = FontFamily(Font(file = file)), fontSize = 20.sp))
+            }
+        }
+
+        // First render captures the Regular-derived "Zoxca"; second uses the Bold-derived one.
+        render(regularAsZoxca)
+        val secondPdf = render(boldAsZoxca)
+
+        // The embedded "Zoxca" in the second PDF must carry Bold metrics, not the Regular
+        // ones the first render would have shadowed in with.
+        val embeddedW = Loader.loadPDF(secondPdf).use { doc ->
+            val page = doc.getPage(0)
+            val name = page.resources.fontNames.first { page.resources.getFont(it).name?.contains("Zoxca") == true }
+            page.resources.getFont(name).getStringWidth("W")
+        }
+        val regularW = PDDocumentWidth("fonts/Inter-Regular.ttf")
+        val boldW = PDDocumentWidth("fonts/Inter-Bold.ttf")
+        assertTrue(regularW != boldW, "test premise: Inter Regular and Bold have different 'W' widths")
+        kotlin.test.assertEquals(boldW, embeddedW, "second render must embed its own (Bold) font, got W=$embeddedW (regular=$regularW, bold=$boldW)")
+    }
+
+    private fun PDDocumentWidth(resource: String): Float =
+        org.apache.pdfbox.pdmodel.PDDocument().use { doc ->
+            val bytes = Thread.currentThread().contextClassLoader.getResourceAsStream(resource)!!.readBytes()
+            PDType0Font.load(doc, bytes.inputStream()).getStringWidth("W")
+        }
+
+    @Test
     fun `reconstructed typeface has identical metrics to the source font`() {
         val interBytes = Thread.currentThread().contextClassLoader
             .getResourceAsStream("fonts/Inter-Regular.ttf")!!.readBytes()
@@ -105,14 +157,17 @@ class FontEmbeddingTest {
         }
     }
 
+    private fun renameInterTo_Qnter(): ByteArray = renameFont("fonts/Inter-Regular.ttf", "Qnter")
+
     /**
-     * Byte-patches the bundled Inter's name table, replacing "Inter" with "Qnter" in both
-     * ASCII and UTF-16BE name records, producing a structurally valid font with an unknown
-     * family name.
+     * Byte-patches [resource]'s name table, replacing "Inter" with [to] (which must be 5
+     * chars, matching "Inter") in both ASCII and UTF-16BE name records, producing a
+     * structurally valid font that reports an arbitrary family name.
      */
-    private fun renameInterTo_Qnter(): ByteArray {
+    private fun renameFont(resource: String, to: String): ByteArray {
+        require(to.length == 5) { "replacement must be 5 chars to match 'Inter'" }
         val bytes = Thread.currentThread().contextClassLoader
-            .getResourceAsStream("fonts/Inter-Regular.ttf")!!.readBytes()
+            .getResourceAsStream(resource)!!.readBytes()
         val numTables = ((bytes[4].toInt() and 0xFF) shl 8) or (bytes[5].toInt() and 0xFF)
         var nameOffset = -1
         var nameLength = -1
@@ -126,9 +181,9 @@ class FontEmbeddingTest {
         }
         check(nameOffset > 0) { "name table not found" }
         val ascii = "Inter".toByteArray(Charsets.US_ASCII)
-        val asciiNew = "Qnter".toByteArray(Charsets.US_ASCII)
+        val asciiNew = to.toByteArray(Charsets.US_ASCII)
         val utf16 = "Inter".toByteArray(Charsets.UTF_16BE)
-        val utf16New = "Qnter".toByteArray(Charsets.UTF_16BE)
+        val utf16New = to.toByteArray(Charsets.UTF_16BE)
         var i = nameOffset
         while (i < nameOffset + nameLength - utf16.size) {
             if (matches(bytes, i, utf16)) {
