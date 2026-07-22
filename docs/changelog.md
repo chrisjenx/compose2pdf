@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+## 1.4.0
+
 ### Fixed
 
 - **Any font now renders with correct letter spacing — automatically.** Text laid out with fonts that previously couldn't be embedded (custom `Font(file)`/`Font(resource)` families, platform defaults like `.SF NS` on macOS or Roboto/DejaVu on Linux servers) was drawn with the non-embedded standard-14 Helvetica, whose different glyph widths made letters randomly squash or collide (e.g. `2.5% ($34.69)` rendering as `2.5%($34.69)`). The renderer now embeds the exact typefaces Compose shaped the text with: fonts loaded during composition are captured from Compose's font stack, system fonts resolve through Skia's own font manager (the same lookup the text shaper uses), and the font bytes are reconstructed from Skia's font-table API for PDFBox subsetting. No API change — existing `InterFontFamily`/bundled behavior is byte-identical.
