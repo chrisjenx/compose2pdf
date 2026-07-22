@@ -24,6 +24,10 @@ Complete code examples demonstrating compose2pdf features. All examples are runn
 | 08 | [Multi-page Report]({{ site.baseurl }}/examples/report) | Multi-page, shared headers/footers, tables, page numbers |
 | 09 | Vector vs Raster | Side-by-side comparison of rendering modes |
 | 10 | [Professional Invoice]({{ site.baseurl }}/examples/invoice) | Complete real-world document with all features |
+| 11 | Auto-Pagination | Content flowing across pages automatically |
+| 12 | PaginatedColumn | Page-break-aware column, children kept together |
+| 13 | Header & Footer | Per-page header/footer slots with page numbers |
+| 14 | Custom Fonts | `Font(resource)` families, bundled Inter, generic families — all embedded automatically |
 
 ---
 
@@ -37,9 +41,13 @@ Complete code examples demonstrating compose2pdf features. All examples are runn
 |:---:|:---:|:---:|
 | ![Shapes]({{ site.baseurl }}/assets/images/05-shapes-and-drawing.png){: .rounded .shadow } | ![Images]({{ site.baseurl }}/assets/images/06-images.png){: .rounded .shadow } | ![Links]({{ site.baseurl }}/assets/images/07-links.png){: .rounded .shadow } |
 
-| Multi-page Report | Professional Invoice |
-|:---:|:---:|
-| [![Report]({{ site.baseurl }}/assets/images/08-multi-page-1.png){: .rounded .shadow }]({{ site.baseurl }}/examples/report) | [![Invoice]({{ site.baseurl }}/assets/images/10-invoice.png){: .rounded .shadow }]({{ site.baseurl }}/examples/invoice) |
+| Multi-page Report | Professional Invoice | Custom Fonts |
+|:---:|:---:|:---:|
+| [![Report]({{ site.baseurl }}/assets/images/08-multi-page-1.png){: .rounded .shadow }]({{ site.baseurl }}/examples/report) | [![Invoice]({{ site.baseurl }}/assets/images/10-invoice.png){: .rounded .shadow }]({{ site.baseurl }}/examples/invoice) | ![Custom Fonts]({{ site.baseurl }}/assets/images/14-custom-fonts.png){: .rounded .shadow } |
+
+| Auto-Pagination | PaginatedColumn | Header & Footer |
+|:---:|:---:|:---:|
+| ![Auto-Pagination]({{ site.baseurl }}/assets/images/11-auto-pagination.png){: .rounded .shadow } | ![PaginatedColumn]({{ site.baseurl }}/assets/images/12-paginated-column-1.png){: .rounded .shadow } | ![Header & Footer]({{ site.baseurl }}/assets/images/13-header-footer-1.png){: .rounded .shadow } |
 
 ---
 
@@ -60,6 +68,10 @@ Complete code examples demonstrating compose2pdf features. All examples are runn
 | Vector Mode | [09-vector-mode.pdf]({{ site.baseurl }}/assets/pdfs/09-vector-mode.pdf) |
 | Raster Mode | [09-raster-mode.pdf]({{ site.baseurl }}/assets/pdfs/09-raster-mode.pdf) |
 | Professional Invoice | [10-invoice.pdf]({{ site.baseurl }}/assets/pdfs/10-invoice.pdf) |
+| Auto-Pagination | [11-auto-pagination.pdf]({{ site.baseurl }}/assets/pdfs/11-auto-pagination.pdf) |
+| PaginatedColumn | [12-paginated-column.pdf]({{ site.baseurl }}/assets/pdfs/12-paginated-column.pdf) |
+| Header & Footer | [13-header-footer.pdf]({{ site.baseurl }}/assets/pdfs/13-header-footer.pdf) |
+| Custom Fonts | [14-custom-fonts.pdf]({{ site.baseurl }}/assets/pdfs/14-custom-fonts.pdf) |
 
 ---
 

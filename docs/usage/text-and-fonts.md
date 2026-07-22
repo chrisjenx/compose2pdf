@@ -87,6 +87,9 @@ Text(
 
 ## Fonts
 
+![Custom fonts example]({{ site.baseurl }}/assets/images/14-custom-fonts.png){: .rounded .shadow .mb-4 }
+*Custom fonts example (Montserrat via `Font(resource)`, bundled Inter, generic families) — [download PDF]({{ site.baseurl }}/assets/pdfs/14-custom-fonts.pdf), source: [`14_CustomFonts.kt`](https://github.com/chrisjenx/compose2pdf/blob/main/examples/src/main/kotlin/com/chrisjenx/compose2pdf/examples/14_CustomFonts.kt)*
+
 ### Default: InterFontFamily
 
 By default, `renderToPdf` uses `InterFontFamily` -- a bundled set of static Inter fonts:
@@ -100,26 +103,23 @@ By default, `renderToPdf` uses `InterFontFamily` -- a bundled set of static Inte
 
 These are embedded and subsetted automatically, so PDFs look the same on every system.
 
-### Using system fonts
+### Any font works — automatically
 
-Pass `null` to use system fonts instead:
-
-```kotlin
-val pdf = renderToPdf(defaultFontFamily = null) {
-    Text("Using system fonts")
-}
-```
-
-The library resolves system fonts from platform-specific directories (macOS, Linux, Windows). System fonts are embedded in the PDF via PDFBox's automatic subsetting.
+Whatever font Compose lays the text out with is the font the PDF embeds. The renderer
+captures the exact typefaces from Compose's font stack during composition, so custom
+fonts, theme typography, and platform defaults all render with correct glyphs and
+letter spacing — no configuration needed.
 
 ### Using a custom font
 
-Supply your own `FontFamily`:
+Supply your own `FontFamily` — either as the document default or anywhere inside your
+content (e.g. through your `MaterialTheme` typography):
 
 ```kotlin
 val myFont = FontFamily(
     Font(resource = "fonts/MyFont-Regular.ttf", weight = FontWeight.Normal),
     Font(resource = "fonts/MyFont-Bold.ttf", weight = FontWeight.Bold),
+    Font(resource = "fonts/MyFont-Italic.ttf", weight = FontWeight.Normal, style = FontStyle.Italic),
 )
 
 val pdf = renderToPdf(defaultFontFamily = myFont) {
@@ -127,20 +127,48 @@ val pdf = renderToPdf(defaultFontFamily = myFont) {
 }
 ```
 
-Place font files in your `src/main/resources/fonts/` directory.
+Place font files in your `src/main/resources/fonts/` directory. The font does **not**
+need to be installed on the machine — the loaded font data itself is subset and
+embedded. Declare every weight/style you use so each renders from a real font file.
+
+{: .note }
+**Shipping fonts with the app is the most reliable setup for servers.** A headless
+Linux JVM backend needs no fonts installed at all when the `FontFamily` is loaded
+from resources — output is identical across dev machines, CI, and production.
+
+### Using system fonts
+
+Pass `null` to use the platform default font instead:
+
+```kotlin
+val pdf = renderToPdf(defaultFontFamily = null) {
+    Text("Using the system font")
+}
+```
+
+The typeface the platform resolves (San Francisco on macOS, Roboto/DejaVu on Linux,
+Segoe UI on Windows) is embedded via subsetting. Note that output then depends on
+which fonts the host has installed — bundle the font in resources when you need
+identical output everywhere.
 
 ### Font resolution chain
 
-When the converter encounters text, it resolves fonts in this order:
+For each text run, the converter resolves the font in this order:
 
-1. **Bundled fonts** -- Inter Regular/Bold/Italic/BoldItalic (when using `InterFontFamily`)
-2. **System fonts** -- searched by font-family name in platform font directories
-3. **PDF standard 14** -- Helvetica, Times-Roman, Courier (fallback; always available, never embedded)
+1. **Bundled Inter** -- Regular/Bold/Italic/BoldItalic (when the text uses `InterFontFamily`)
+2. **Captured typefaces** -- the exact fonts Compose loaded while laying out this content (covers `Font(resource)`/`Font(file)` families and theme typography)
+3. **The composition's Skia font collection** -- the same lookup Compose's text shaper uses for system fonts and glyph fallback
+4. **Skia's system font manager**, then **platform font directories** -- by family name
+5. **PDF standard 14** -- Helvetica, Times-Roman, Courier (last resort; never embedded). Substituted glyphs are automatically compressed to fit the space the layout measured, so text can't overlap, and a warning naming the family is logged.
 
 ---
 
 {: .warning }
-**Variable fonts are not supported.** PDFBox cannot render variable fonts correctly -- they are automatically skipped during font resolution. Use static `.ttf` or `.otf` font files only.
+**Variable fonts embed at their default instance only.** PDFBox cannot instantiate
+variable-font axes, so a variable font's regular (default) instance embeds fine, but
+instances styled away from the default — e.g. **bold** of a variable-only font like
+macOS's `.SF NS` — fall back to a compressed standard font. Prefer static `.ttf`/`.otf`
+files per weight (most families, including Inter and Roboto, distribute them).
 
 ---
 

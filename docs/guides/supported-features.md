@@ -109,7 +109,9 @@ Comprehensive matrix of Compose feature support in compose2pdf's vector and rast
 | Animation | N/A | N/A | Static snapshot only |
 | `TextField` (input) | No | No | PDF is static output |
 | `DropdownMenu` | No | No | Interactive component |
-| Variable fonts | No | No | Skipped by font resolver; use static .ttf/.otf |
+| Custom fonts (`Font(resource)`/`Font(file)`) | Full | Full | Captured from the composition and embedded automatically |
+| System fonts | Full | Full | Embedded via Skia's font manager (subset) |
+| Variable fonts | Limited | Limited | Default instance embeds; bold/italic instances of variable-only fonts fall back — use static .ttf/.otf per weight |
 | Per-page headers/footers (auto-pagination) | No | No | Use manual pagination for fixed page chrome |
 
 {: .note }

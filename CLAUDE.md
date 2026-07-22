@@ -15,8 +15,8 @@
 
 ## Tech Stack
 
-- **Kotlin** 2.3.20, JVM target only
-- **Compose Multiplatform** 1.10.3 (Desktop)
+- **Kotlin** 2.4.0, JVM target only
+- **Compose Multiplatform** 1.11.1 (Desktop) — always confirm against `gradle/libs.versions.toml`, which is the source of truth
 - **Apache PDFBox** 3.0.7 (SVG→PDF conversion, image embedding, font subsetting)
 - **Gradle** 8.14 — versions centralized in `gradle/libs.versions.toml`
 
@@ -40,6 +40,7 @@ Visual regression suite comparing Compose reference renders against rasterized P
 - Report: `fidelity-test/build/reports/fidelity/index.html`
 - Diff uses neighborhood-minimum comparison (radius=3, tolerance=8) to ignore anti-aliasing
 - Gradle caches test results aggressively — use `--rerun-tasks` after changing `ImageMetrics` or `FidelityReport`
+- Inspect a generated PDF directly: `pdffonts foo.pdf` (lists embedded fonts + emb/sub columns — how to confirm a font embedded vs. fell back to standard-14), `pdftoppm -r 200 -png foo.pdf out` (rasterize to eyeball glyphs/spacing)
 
 ## CI
 
@@ -72,6 +73,8 @@ Types: `PdfPageConfig` (A4/A4WithMargins/Letter/LetterWithMargins/A3/A3WithMargi
 - `compose2pdf/src/main/kotlin/.../internal/SvgToPdfConverter.kt` — SVG → PDF pages
 - `compose2pdf/src/main/kotlin/.../internal/PaginatedColumn.kt` — Smart page-break layout
 - `compose2pdf/src/main/kotlin/.../internal/FontResolver.kt` — Font resolution + subsetting
+- `compose2pdf/src/main/kotlin/.../internal/TypefaceCapture.kt` — `ComposeFontStack` (reflective bridge to Compose's font stack) + captured-typeface registry
+- `compose2pdf/src/main/kotlin/.../internal/SkiaTypefaceEmbedder.kt` — rebuilds embeddable font bytes from Skia `Typeface` tables
 - `fidelity-test/src/test/.../FidelityFixtures.kt` — All fidelity test composables
 
 ## Architecture
@@ -103,7 +106,9 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 ### Rendering
 - **`@InternalComposeUiApi` opt-in required** — `CanvasLayersComposeScene` is internal Compose API
 - **Reflective scene driver** — `CanvasLayersComposeScene` is `@InternalComposeUiApi` ("subject to change without notice in major/minor/patch") and was reshaped in CMP 1.12 (`coroutineContext`/`invalidate` + `render(canvas, nanoTime)` → `FrameRecomposer` + `measureAndLayout`/`draw(canvas)`). Because compose2pdf ships **one** binary and there is no stable API for drawing scene commands onto a Skia canvas, `internal ComposeSceneRenderer` (in `src/main`) resolves the scene API by **reflection** at runtime — detecting the shape by structure (presence of `FrameRecomposer`, factory arity), not a version string — so the single jar runs on 1.11 and 1.12+. Stable calls stay typed (`asComposeCanvas`, `IntSize`, `Density`, the Skia canvas); only construction/drive are reflective, and reflective `invoke`/`newInstance` unwrap `InvocationTargetException` so Compose's own exceptions propagate normally. An unrecognized future shape throws `Compose2PdfException` (fail-fast). Cross-version behaviour is proven by the `compat-consumer` matrix. **Do not reintroduce build-time `cmpLegacy`/`cmpNext` source variants** — add a new reflective branch instead if CMP reshapes the API again.
-- **Variable fonts excluded** — `FontResolver.isVariableFont()` skips fonts with `fvar` table
+- **Shaping fonts are embedded automatically** — the PDF must draw with the same font Skia shaped the text with, or glyph-width mismatches squash letters. `ComposeFontStack` (reflective, best-effort — same philosophy as the scene driver) walks `LocalFontFamilyResolver → SkiaFontLoader → FontCache` to harvest every typeface Compose loaded (custom `Font(file/resource)` families live ONLY there — Skia registers them under opaque cache keys, not family names) and to query the composition's Skia `FontCollection`; `SkiaTypefaceEmbedder` rebuilds embeddable TTF bytes from `Typeface.getTableTags/getTableData`. Resolution order: bundled Inter → captured typefaces → FontCollection → `FontMgr.default` → filesystem → standard-14 (+ per-glyph Tz compression so substituted glyphs can't collide). Reflective member names are verified against CMP 1.10/1.11/1.12 jars.
+- **Verifying reflective member names** — inspect the actual CMP/skiko jars in `~/.gradle/caches/modules-2/files-2.1/org.jetbrains.compose.ui/ui-text-desktop/<ver>/` and `.../org.jetbrains.skiko/skiko-awt/<ver>/` with `javap -cp <jar> <class>` (add `-p` for private members); unzip the matching `-sources.jar` to read the Kotlin. This is how the `ComposeSceneRenderer`/`ComposeFontStack` names are checked across versions.
+- **Variable fonts excluded from filesystem search** — `FontResolver.isVariableFont()` skips font files with `fvar` table. Skia-sourced typefaces embed at their default instance instead; only instances styled away from default on `wght`/`wdth`/`slnt`/`ital` axes are rejected (macOS `.SF NS` regular reports non-default `opsz` and must still embed)
 - **SVGCanvas bezier approximation** — non-uniform rounded rects become complex bezier paths; use `PdfRoundedCornerShape`
 - **Bundled fonts loaded from classpath** — `FontResolver` loads Inter fonts directly from `InputStream`, no temp files
 - **`Compose2PdfException` wraps rendering errors** — `IllegalArgumentException` (precondition failures) passes through unwrapped
@@ -119,6 +124,7 @@ Auto-pagination: PaginatedColumn (smart page breaks)
 ### Testing
 - **Fidelity tests assume identical render path** — Changing `renderToPdf` default behavior (e.g., wrapping content in extra layout layers or using a taller scene) can break fidelity comparisons; single-page content must fall back to the original render path
 - **Compose `Placeable` is not fakeable** — `width`/`height` are final; test layout logic with raw `List<Int>` heights instead of mock `Placeable` objects
+- **Newly-added test class not found** — a brand-new test file can report `No tests found for given includes` under a `--tests` filter until compiled; run `./gradlew :compose2pdf:compileTestKotlin --rerun-tasks` once, then the filter matches
 
 ## Code Conventions
 

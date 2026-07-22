@@ -13,6 +13,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+### Fixed
+
+- **Any font now renders with correct letter spacing — automatically.** Text laid out with fonts that previously couldn't be embedded (custom `Font(file)`/`Font(resource)` families, platform defaults like `.SF NS` on macOS or Roboto/DejaVu on Linux servers) was drawn with the non-embedded standard-14 Helvetica, whose different glyph widths made letters randomly squash or collide (e.g. `2.5% ($34.69)` rendering as `2.5%($34.69)`). The renderer now embeds the exact typefaces Compose shaped the text with: fonts loaded during composition are captured from Compose's font stack, system fonts resolve through Skia's own font manager (the same lookup the text shaper uses), and the font bytes are reconstructed from Skia's font-table API for PDFBox subsetting. No API change — existing `InterFontFamily`/bundled behavior is byte-identical.
+- Safety net: if a font still can't be embedded (e.g. a bold instance of a variable-only system font), glyphs wider than the space the layout reserved are horizontally compressed so they can never collide, and `FontResolver` logs a warning naming the family.
+- **Bold text now embeds the bold face.** Skia's SVG writer emits `font-weight="600"` for typefaces whose OS/2 weight is 700 (e.g. Inter-Bold), which the resolver previously classified as non-bold — bold text silently embedded the regular face. Weights >= 600 now select the bold variant, matching Compose's own font matching.
+
+### Added
+
+- New runnable example [`14_CustomFonts.kt`](https://github.com/chrisjenx/compose2pdf/blob/main/examples/src/main/kotlin/com/chrisjenx/compose2pdf/examples/14_CustomFonts.kt) demonstrating custom `Font(resource)` families (Montserrat), bundled Inter, and generic families — rendered output embedded in the docs.
+
 ## 1.3.0
 
 ### Added

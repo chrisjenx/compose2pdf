@@ -42,13 +42,44 @@ renderToPdf(mode = RenderMode.VECTOR) { /* content */ }
 
 ---
 
-## Variable fonts don't render correctly
+## Letters look squashed / spacing is uneven
 
-**Problem:** A custom font appears as a fallback (Helvetica) or renders incorrectly.
+**Problem:** Some letter pairs render with no space between them, or spacing looks
+subtly uneven (e.g. `2.5% ($34.69)` showing as `2.5%($34.69)`).
 
-**Cause:** PDFBox cannot handle variable fonts (fonts with an `fvar` OpenType table). The library's `FontResolver` automatically skips them.
+**Cause:** The text was drawn with a *substituted* font whose glyph widths differ
+from the font Compose laid the text out with. Since v1.3.1 the renderer embeds the
+exact shaping fonts automatically, so this only happens when a font genuinely can't
+be embedded — check the logs for a `FontResolver` warning naming the family.
 
-**Fix:** Use static `.ttf` or `.otf` font files. Most font families distribute static variants alongside variable ones. For example, use `Inter-Regular.ttf` instead of `Inter-Variable.ttf`.
+**Fix:** Make the shaping font embeddable — usually by declaring it from static
+font files via `Font(resource = ...)`. The most common remaining trigger is **bold
+text in a variable-only system font** (e.g. macOS `.SF NS`): declare an explicit
+`FontFamily` with a static bold file instead. Substituted glyphs are compressed so
+they can never overlap, but only the real font gives exact output.
+
+---
+
+## Bold or italic text renders in a fallback font
+
+**Problem:** Regular text embeds correctly, but bold/italic falls back to a
+compressed standard font (the `FontResolver` warning names the family).
+
+**Cause:** PDFBox cannot instantiate variable-font axes. A variable font's default
+(regular) instance embeds fine, but a bold/italic instance of a variable-only
+family cannot be embedded faithfully.
+
+**Fix:** Declare each weight/style from a static file:
+
+```kotlin
+val brand = FontFamily(
+    Font(resource = "fonts/Brand-Regular.ttf", weight = FontWeight.Normal),
+    Font(resource = "fonts/Brand-Bold.ttf", weight = FontWeight.Bold),
+)
+```
+
+Most families (Inter, Roboto, etc.) distribute static variants alongside variable
+ones — use `Inter-Regular.ttf`/`Inter-Bold.ttf` rather than `Inter-Variable.ttf`.
 
 ---
 

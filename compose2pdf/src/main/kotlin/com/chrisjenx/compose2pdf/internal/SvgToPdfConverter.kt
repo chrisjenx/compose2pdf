@@ -378,13 +378,23 @@ internal object SvgToPdfConverter {
             cs.setFont(font, fontSize)
 
             if (xPositions.size > 1 && xPositions.size >= text.length) {
-                // Position each glyph individually for precise placement
+                // Position each glyph individually for precise placement.
+                // When FontResolver fell back to a standard-14 font (always PDType1Font;
+                // matched fonts embed as PDType0Font), its glyph widths don't match the
+                // advances the shaping font produced, so a wide glyph (e.g. Helvetica '%')
+                // can overrun its slot and collide with the next glyph. Compress such
+                // glyphs horizontally (Tz) to fit the slot the layout reserved for them.
+                val substituted = font is org.apache.pdfbox.pdmodel.font.PDType1Font
                 for (i in text.indices) {
                     cs.newLineAtOffset(
                         if (i == 0) xPositions[0] else xPositions[i] - xPositions[i - 1],
                         if (i == 0) yOffset else 0f,
                     )
-                    cs.showText(text[i].toString())
+                    val glyph = text[i].toString()
+                    val scale = if (substituted) glyphFitScale(font, glyph, fontSize, xPositions, i, text.length) else 100f
+                    if (scale < 100f) cs.setHorizontalScaling(scale)
+                    cs.showText(glyph)
+                    if (scale < 100f) cs.setHorizontalScaling(100f)
                 }
             } else {
                 val x0 = xPositions.firstOrNull() ?: 0f
@@ -393,6 +403,35 @@ internal object SvgToPdfConverter {
             }
             cs.endText()
             cs.restoreGraphicsState()
+        }
+
+        /**
+         * Horizontal scaling (percent) that fits [glyph] into the slot between its
+         * x-position and the next glyph's. Returns 100 when the glyph already fits,
+         * has no following slot (last glyph), or its width can't be determined.
+         */
+        private fun glyphFitScale(
+            font: PDFont,
+            glyph: String,
+            fontSize: Float,
+            xPositions: List<Float>,
+            index: Int,
+            textLength: Int,
+        ): Float {
+            if (index + 1 >= textLength || index + 1 >= xPositions.size) return 100f
+            val slotWidth = xPositions[index + 1] - xPositions[index]
+            if (slotWidth <= 0f) return 100f
+            val naturalWidth = try {
+                font.getStringWidth(glyph) / 1000f * fontSize
+            } catch (e: Exception) {
+                return 100f // unencodable in this font; showText will surface the real error
+            }
+            // Small tolerance so float noise doesn't emit needless Tz operators
+            if (naturalWidth <= slotWidth + fontSize * 0.01f) return 100f
+            // Compress to exactly fill the slot — no floor, or a glyph much wider than its
+            // slot would still overrun and collide with the next one (the very thing this
+            // guards against). coerceAtLeast(1f) only rules out a degenerate zero scale.
+            return (slotWidth / naturalWidth * 100f).coerceAtLeast(1f)
         }
 
         private fun renderGroup(elem: Element) {
