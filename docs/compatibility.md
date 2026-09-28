@@ -16,9 +16,9 @@ compose2pdf is tested weekly against the 3 most recent Compose Multiplatform rel
 <!-- BEGIN cmp-matrix -->
 | Compose Multiplatform | Kotlin | Status |
 |:----------------------|:-------|:-------|
-| 1.12.0-beta01 | 2.4.0 | CI tested |
-| **1.11.1** | 2.4.0 | CI tested (current) |
-| 1.10.3 | 2.4.0 | CI tested |
+| 1.13.0-alpha01 | 2.4.20 | CI tested |
+| **1.12.1** | 2.4.20 | CI tested (current) |
+| 1.11.1 | 2.4.20 | CI tested |
 <!-- END cmp-matrix -->
 
 {: .note }
