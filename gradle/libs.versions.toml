@@ -1,14 +1,15 @@
 [versions]
 kotlin = "2.4.0"
-compose-multiplatform = "1.13.0-beta02"
+compose-multiplatform = "1.12.2"
 pdfbox = "3.0.7"
 kotlinx-coroutines = "1.10.2"
 maven-publish = "0.34.0"
 
 [libraries]
-# Explicit Compose coordinates: CMP 1.13 deprecates the compose.desktop.common / currentOs accessors
-# (desktop artifacts now carry Skiko natives for every OS; packaging strips the non-target ones).
-compose-desktop = { module = "org.jetbrains.compose.desktop:desktop", version.ref = "compose-multiplatform" }
+# Compose modules the library itself uses (runtime/ui/foundation, and material only for
+# ProvideTextStyle -> defaultFontFamily). Deliberately NOT the `desktop` umbrella, which also drags
+# ui-tooling-preview + ui-util into consumers. Skiko natives come from the consumer's own Compose.
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
 compose-material = { module = "org.jetbrains.compose.material:material", version.ref = "compose-multiplatform" }

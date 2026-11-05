@@ -59,13 +59,12 @@ jobs:
             PRERELEASE_ENTRY=$(echo "$PRERELEASE_VERSIONS" | grep "^${HIGHEST_MINOR}\." | sort -V | tail -1)
           fi
 
-          # Build the version list: up to 2 stable + 1 pre-release, or 3 stable
+          # Support policy: build against the LATEST STABLE minor, and support the PREVIOUS stable
+          # minor plus the NEXT unreleased minor (its newest pre-release) when one exists.
+          # => previous stable + latest stable [+ next pre-release]
+          MATRIX_VERSIONS=$(echo "$LATEST_STABLE" | tail -2)
           if [ -n "$PRERELEASE_ENTRY" ]; then
-            # Take last 2 stable + the pre-release
-            MATRIX_VERSIONS=$(echo "$LATEST_STABLE" | tail -2)
             MATRIX_VERSIONS=$(printf "%s\n%s" "$MATRIX_VERSIONS" "$PRERELEASE_ENTRY")
-          else
-            MATRIX_VERSIONS="$LATEST_STABLE"
           fi
 
           # Fetch the latest stable Kotlin version from Maven Central
@@ -144,9 +143,10 @@ jobs:
             ${{ steps.detect.outputs.matrix }}
             ```
 
-            This PR also bumps the shipped build base in `gradle/libs.versions.toml` to the
-            latest stable Compose/Kotlin (the library ships one binary, built against the
-            currently-released CMP). The compatibility tables in `docs/compatibility.md` and
+            Support policy: build against the latest stable CMP minor; support the previous
+            stable minor and the next unreleased minor (newest pre-release). This PR also bumps
+            the shipped build base in `gradle/libs.versions.toml` to the latest stable
+            Compose/Kotlin (the library ships one binary, built against the currently-released CMP). The compatibility tables in `docs/compatibility.md` and
             `README.md` have been regenerated from the matrix and the new pin.
 
             The compatibility CI will run on this PR to verify the shipped binary runs against

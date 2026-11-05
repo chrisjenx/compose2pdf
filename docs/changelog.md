@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- **Compose Multiplatform 1.13 support** (tested on 1.13.0-beta02 / Skiko 0.156.1). The library is now built against CMP 1.13.0-beta02; the same single binary is CI-tested on CMP 1.11.1, 1.12.2 and 1.13.0-beta02 (and was also smoke-tested locally on 1.10.3 and 1.12.0-beta01).
+- **Compose Multiplatform 1.13 support** (tested on 1.13.0-beta02 / Skiko 0.156.1). The single binary is CI-tested on CMP 1.11.1, 1.12.2 and 1.13.0-beta02 — both the published jar and the full unit suite per version (also smoke-tested locally on 1.10.3 and 1.12.0-beta01).
 
 ### Fixed
 
@@ -27,7 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
-- The published POM now depends on Compose `desktop` **1.13.0-beta02** (previously 1.11.1). Gradle conflict resolution will upgrade consumers on an older Compose to this pre-release unless they pin their Compose version (e.g. with a `strictly` constraint); compose2pdf itself runs on every CI-tested version (1.11+) either way.
+- Built against the latest stable Compose Multiplatform, **1.12.2** (previously 1.11.1). Support policy: the latest stable minor, plus the previous stable minor and the next unreleased minor (newest pre-release).
+- The published POM depends only on the Compose modules compose2pdf uses — `runtime`, `ui`, `foundation` and `material` — instead of the `desktop` umbrella, so `ui-tooling-preview` and `ui-util` are no longer pulled into consumers.
 
 ## 1.4.0
 
