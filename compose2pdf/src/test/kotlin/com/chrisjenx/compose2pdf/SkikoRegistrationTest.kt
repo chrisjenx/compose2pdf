@@ -5,7 +5,6 @@ import androidx.compose.material.Text
 import java.io.ByteArrayOutputStream
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.test.assertTrue
 
 /**
  * CMP 1.13 moved Skiko graphics/text registration out of ServiceLoader into
@@ -30,31 +29,25 @@ class SkikoRegistrationTest {
         runtime.getMethod("clearSkikoComposeImplementation").invoke(null)
     }
 
-    private fun assertPdf(bytes: ByteArray) {
-        assertTrue(bytes.size > 100, "PDF bytes should not be empty, got ${bytes.size}")
-        val header = bytes.copyOfRange(0, 5).toString(Charsets.US_ASCII)
-        assertTrue(header.startsWith("%PDF"), "Expected %PDF header, got: $header")
-    }
-
     @Test
     fun `vector auto-paginated render works on a fresh registry`() =
-        assertPdf(renderToPdf(mode = RenderMode.VECTOR) { Text("Hello") })
+        assertValidPdf(renderToPdf(mode = RenderMode.VECTOR) { Text("Hello") })
 
     @Test
     fun `vector single-page render works on a fresh registry`() =
-        assertPdf(renderToPdf(mode = RenderMode.VECTOR, pagination = PdfPagination.SINGLE_PAGE) { Text("Hello") })
+        assertValidPdf(renderToPdf(mode = RenderMode.VECTOR, pagination = PdfPagination.SINGLE_PAGE) { Text("Hello") })
 
     @Test
     fun `raster auto-paginated render works on a fresh registry`() =
-        assertPdf(renderToPdf(mode = RenderMode.RASTER) { Text("Hello") })
+        assertValidPdf(renderToPdf(mode = RenderMode.RASTER) { Text("Hello") })
 
     @Test
     fun `raster single-page render works on a fresh registry`() =
-        assertPdf(renderToPdf(mode = RenderMode.RASTER, pagination = PdfPagination.SINGLE_PAGE) { Text("Hello") })
+        assertValidPdf(renderToPdf(mode = RenderMode.RASTER, pagination = PdfPagination.SINGLE_PAGE) { Text("Hello") })
 
     @Test
     fun `vector render with header and footer works on a fresh registry`() =
-        assertPdf(
+        assertValidPdf(
             renderToPdf(
                 mode = RenderMode.VECTOR,
                 header = { Text("Header") },
@@ -64,7 +57,7 @@ class SkikoRegistrationTest {
 
     @Test
     fun `raster render with header and footer works on a fresh registry`() =
-        assertPdf(
+        assertValidPdf(
             renderToPdf(
                 mode = RenderMode.RASTER,
                 header = { Text("Header") },
@@ -74,16 +67,16 @@ class SkikoRegistrationTest {
 
     @Test
     fun `manual multi-page vector render works on a fresh registry`() =
-        assertPdf(renderToPdf(pages = 2, mode = RenderMode.VECTOR) { i -> Text("Page $i") })
+        assertValidPdf(renderToPdf(pages = 2, mode = RenderMode.VECTOR) { i -> Text("Page $i") })
 
     @Test
     fun `manual multi-page raster render works on a fresh registry`() =
-        assertPdf(renderToPdf(pages = 2, mode = RenderMode.RASTER) { i -> Text("Page $i") })
+        assertValidPdf(renderToPdf(pages = 2, mode = RenderMode.RASTER) { i -> Text("Page $i") })
 
     @Test
     fun `streaming vector render works on a fresh registry`() {
         val out = ByteArrayOutputStream()
         renderToPdf(out, mode = RenderMode.VECTOR) { Text("Hello") }
-        assertPdf(out.toByteArray())
+        assertValidPdf(out.toByteArray())
     }
 }

@@ -4,7 +4,6 @@ import org.jetbrains.skia.FontMgr
 import org.jetbrains.skia.FontSlant
 import org.jetbrains.skia.Typeface
 import org.jetbrains.skia.paragraph.FontCollection
-import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
@@ -27,47 +26,52 @@ import java.lang.reflect.Modifier
  */
 internal object SkiaFontStyleCompat {
 
-    private const val FONT_STYLE = "org.jetbrains.skia.FontStyle"
+    /** A Skia typeface's OpenType weight (100–900) and whether it is slanted. */
+    data class Style(val weight: Int, val italic: Boolean)
+
     private const val NORMAL_WIDTH = 5
 
-    private val fontStyleClass: Class<*> by lazy { Class.forName(FONT_STYLE) }
+    private val fontStyleClass: Class<*> by lazy { Class.forName("org.jetbrains.skia.FontStyle") }
 
     /** true when FontStyle is the >= 0.156 inline value class (members exchange a raw `int`). */
     private val isValueClass: Boolean by lazy {
         fontStyleClass.methods.any { it.name == "box-impl" && Modifier.isStatic(it.modifiers) }
     }
 
-    /** Builds the argument a FontStyle-taking Skia method expects: a boxed FontStyle or its raw `int`. */
-    private fun styleArg(weight: Int, italic: Boolean): Any {
-        val slant = if (italic) FontSlant.ITALIC else FontSlant.UPRIGHT
-        return if (isValueClass) {
-            staticCtorImpl.call(null, weight, NORMAL_WIDTH, slant)!!
-        } else {
-            fontStyleClass.getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, FontSlant::class.java)
-                .newInstance(weight, NORMAL_WIDTH, slant)
-        }
-    }
+    // The version split is resolved once, here: each function below already speaks the right shape —
+    // a boxed FontStyle with instance getters (<= 0.15x) or a raw `int` with static accessors (0.156+).
 
-    private val staticCtorImpl: Method by lazy {
-        fontStyleClass.methods.first {
-            it.name == "constructor-impl" && Modifier.isStatic(it.modifiers) && it.parameterCount == 3
-        }
-    }
+    /** (weight, slant) → the argument FontStyle-taking Skia methods expect (boxed FontStyle or raw int). */
+    private val newStyle: (Int, FontSlant) -> Any by lazy { styleFactory() }
 
-    /** Instance getter on the boxed class (`getWeight`) or static `-impl` taking the raw int (`getWeight-…`). */
-    private fun accessor(baseName: String): Method =
+    private fun styleFactory(): (Int, FontSlant) -> Any {
         if (isValueClass) {
-            fontStyleClass.methods.first {
-                Modifier.isStatic(it.modifiers) && it.parameterCount == 1 &&
-                    it.parameterTypes[0] == Int::class.javaPrimitiveType &&
-                    (it.name == "$baseName-impl" || it.name.startsWith("$baseName-"))
+            val ctorImpl = fontStyleClass.methods.first {
+                it.name == "constructor-impl" && Modifier.isStatic(it.modifiers) && it.parameterCount == 3
             }
-        } else {
-            fontStyleClass.getMethod(baseName)
+            return { weight, slant -> ctorImpl.invokeUnwrapped(null, weight, NORMAL_WIDTH, slant)!! }
         }
+        val ctor = fontStyleClass.getConstructor(
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, FontSlant::class.java,
+        )
+        return { weight, slant -> ctor.newInstanceUnwrapped(weight, NORMAL_WIDTH, slant) }
+    }
 
-    private val getWeight: Method by lazy { accessor("getWeight") }
-    private val getSlant: Method by lazy { accessor("getSlant") }
+    private val weightOf: (Any?) -> Any? by lazy { accessor("getWeight") }
+    private val slantOf: (Any?) -> Any? by lazy { accessor("getSlant") }
+
+    /** Instance getter on the boxed class (`getWeight`) or static `getWeight-<hash|impl>(int)`. */
+    private fun accessor(baseName: String): (Any?) -> Any? {
+        if (!isValueClass) {
+            val getter = fontStyleClass.getMethod(baseName)
+            return { style -> getter.invokeUnwrapped(style) }
+        }
+        val impl = fontStyleClass.methods.first {
+            Modifier.isStatic(it.modifiers) && it.parameterCount == 1 &&
+                it.parameterTypes[0] == Int::class.javaPrimitiveType && it.name.startsWith("$baseName-")
+        }
+        return { style -> impl.invokeUnwrapped(null, style) }
+    }
 
     private val typefaceGetFontStyle: Method by lazy { mangledOrPlain(Typeface::class.java, "getFontStyle", 0) }
     private val collectionFindTypefaces: Method by lazy { mangledOrPlain(FontCollection::class.java, "findTypefaces", 2) }
@@ -80,26 +84,19 @@ internal object SkiaFontStyleCompat {
                 (it.name == name || it.name.startsWith("$name-"))
         }
 
-    private fun Method.call(receiver: Any?, vararg args: Any?): Any? =
-        try {
-            invoke(receiver, *args)
-        } catch (e: InvocationTargetException) {
-            throw e.targetException
-        }
+    private fun styleArg(weight: Int, italic: Boolean): Any =
+        newStyle(weight, if (italic) FontSlant.ITALIC else FontSlant.UPRIGHT)
 
-    /** The OpenType weight (100–900) and italic-ness of [typeface]. */
-    fun weightAndItalic(typeface: Typeface): Pair<Int, Boolean> {
-        val style = typefaceGetFontStyle.call(typeface)
-        val weight = if (isValueClass) getWeight.call(null, style) else getWeight.call(style)
-        val slant = if (isValueClass) getSlant.call(null, style) else getSlant.call(style)
-        return (weight as Int) to (slant != FontSlant.UPRIGHT)
+    fun styleOf(typeface: Typeface): Style {
+        val style = typefaceGetFontStyle.invokeUnwrapped(typeface)
+        return Style(weightOf(style) as Int, slantOf(style) != FontSlant.UPRIGHT)
     }
 
     fun findTypefaces(collection: FontCollection, families: Array<String>, weight: Int, italic: Boolean): Array<Typeface?> {
         @Suppress("UNCHECKED_CAST")
-        return collectionFindTypefaces.call(collection, families, styleArg(weight, italic)) as Array<Typeface?>
+        return collectionFindTypefaces.invokeUnwrapped(collection, families, styleArg(weight, italic)) as Array<Typeface?>
     }
 
     fun matchFamilyStyle(mgr: FontMgr, family: String, weight: Int, italic: Boolean): Typeface? =
-        mgrMatchFamilyStyle.call(mgr, family, styleArg(weight, italic)) as Typeface?
+        mgrMatchFamilyStyle.invokeUnwrapped(mgr, family, styleArg(weight, italic)) as Typeface?
 }

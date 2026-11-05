@@ -1,7 +1,6 @@
 package com.chrisjenx.compose2pdf.internal
 
 import com.chrisjenx.compose2pdf.Compose2PdfException
-import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
@@ -18,7 +17,7 @@ import java.lang.reflect.Modifier
  *
  * The function does not exist before 1.13 (registration was implicit), and compose2pdf ships ONE
  * binary spanning 1.11+, so it is resolved by reflection: present → invoked, absent → no-op.
- * Registering the same instances again is a no-op in Compose, so [ensureRegistered] runs on every
+ * Registering the same instances again is a no-op in Compose, so [ensureRegistered] runs before every
  * render rather than once per process — that keeps it correct even if something in the host
  * process calls `clearSkikoComposeImplementation()` between renders.
  */
@@ -29,11 +28,7 @@ internal object SkikoComposeRuntime {
 
     /** The static no-arg register function, or null on CMP < 1.13 where registration is implicit. */
     private val register: Method? by lazy {
-        val cls = try {
-            Class.forName(RUNTIME_CLASS)
-        } catch (e: ClassNotFoundException) {
-            return@lazy null
-        }
+        val cls = classOrNull(RUNTIME_CLASS) ?: return@lazy null
         cls.methods.firstOrNull { it.name == REGISTER && it.parameterCount == 0 && Modifier.isStatic(it.modifiers) }
             ?: throw Compose2PdfException(
                 "compose2pdf found $RUNTIME_CLASS but not a static no-arg $REGISTER(). The installed " +
@@ -43,11 +38,6 @@ internal object SkikoComposeRuntime {
     }
 
     fun ensureRegistered() {
-        val method = register ?: return
-        try {
-            method.invoke(null)
-        } catch (e: InvocationTargetException) {
-            throw e.targetException
-        }
+        register?.invokeUnwrapped(null)
     }
 }

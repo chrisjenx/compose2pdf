@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.ui.text.TextStyle
-import com.chrisjenx.compose2pdf.Compose2PdfException
 import com.chrisjenx.compose2pdf.LocalPdfLinkCollector
 import com.chrisjenx.compose2pdf.LocalPdfPageConfig
 import com.chrisjenx.compose2pdf.PdfLinkAnnotation
@@ -60,7 +59,6 @@ internal object PdfRenderer {
         footer: (@Composable (PdfPageInfo) -> Unit)? = null,
         content: @Composable () -> Unit,
     ): PDDocument {
-        SkikoComposeRuntime.ensureRegistered()
         if (header == null && footer == null) {
             // Fast path: exactly the pre-slots pipeline (fidelity guarantee — see CLAUDE.md gotchas).
             return when (pagination) {
@@ -454,7 +452,6 @@ internal object PdfRenderer {
         content: @Composable (pageIndex: Int) -> Unit,
     ): PDDocument {
         require(pageCount > 0) { "pageCount must be positive, was $pageCount" }
-        SkikoComposeRuntime.ensureRegistered()
         return when (mode) {
             RenderMode.VECTOR -> renderVector(pageCount, config, density, defaultFontFamily, content)
             RenderMode.RASTER -> renderRaster(pageCount, config, density, defaultFontFamily, content)

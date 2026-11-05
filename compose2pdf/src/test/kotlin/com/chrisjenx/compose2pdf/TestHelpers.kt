@@ -40,3 +40,10 @@ fun solidColorPngBytes(color: java.awt.Color, size: Int = 40): ByteArray {
     ImageIO.write(image, "png", out)
     return out.toByteArray()
 }
+
+/** Asserts [bytes] is a non-trivial PDF (starts with the `%PDF` header). */
+fun assertValidPdf(bytes: ByteArray) {
+    kotlin.test.assertTrue(bytes.size > 100, "PDF bytes should not be empty, got ${bytes.size}")
+    val header = bytes.copyOfRange(0, 5).toString(Charsets.US_ASCII)
+    kotlin.test.assertTrue(header.startsWith("%PDF"), "Expected %PDF header, got: $header")
+}
