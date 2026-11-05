@@ -10,8 +10,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import com.chrisjenx.compose2pdf.Compose2PdfException
 import kotlinx.coroutines.Dispatchers
-import java.lang.reflect.Constructor
-import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import org.jetbrains.skia.Canvas
@@ -40,6 +38,9 @@ internal object ComposeSceneRenderer {
         density: Density,
         content: @Composable () -> Unit,
     ) {
+        // Every vector scene funnels through here; CMP 1.13+ needs Skiko registered before the
+        // canvas wrapper or scene touches the graphics registry (no-op on earlier versions).
+        SkikoComposeRuntime.ensureRegistered()
         val composeCanvas: Any = canvas.asComposeCanvas()
         // The factory takes a boxed IntSize (mangled name, but the param is the value-class object,
         // not an unboxed long); passing it through Any args boxes it to the IntSize wrapper.
@@ -66,19 +67,26 @@ internal object ComposeSceneRenderer {
         classOrNull(COMPOSE_SCENE) ?: fail("$COMPOSE_SCENE not found")
     }
 
-    // PlatformContext.Empty is a stateless `class` (public no-arg ctor) in both 1.11 and 1.12; one
-    // shared empty instance is reused across renders (a scene keeps no mutable state on it).
-    private val platformContext: Any by lazy {
+    private val platformContextCtor by lazy {
         val cls = classOrNull(PLATFORM_CONTEXT_EMPTY) ?: fail("$PLATFORM_CONTEXT_EMPTY not found")
-        cls.getDeclaredConstructor().make()
+        cls.getDeclaredConstructor()
     }
 
-    private fun classOrNull(name: String): Class<*>? =
-        try {
-            Class.forName(name)
-        } catch (e: ClassNotFoundException) {
-            null
-        }
+    // ONE PlatformContext.Empty per top-level render, shared by that render's scenes (measurement,
+    // body, header/footer bands) and replaced by [beginRender]. It must not be process-wide: from
+    // CMP 1.13 Empty owns a lazily created FontFamily.Resolver + FontCache, so a cached instance
+    // would make every render share one FontCache (unbounded growth, 60s access-based eviction,
+    // and same-named fonts from earlier renders shadowing the current one in ComposeFontStack).
+    // Per render — not per scene — so the font capture sees every font the render's scenes loaded.
+    @Volatile private var renderPlatformContext: Any? = null
+
+    /** Starts a new top-level render: its scenes get a fresh PlatformContext (and font stack). */
+    fun beginRender() {
+        renderPlatformContext = null
+    }
+
+    private val platformContext: Any
+        get() = renderPlatformContext ?: platformContextCtor.newInstanceUnwrapped().also { renderPlatformContext = it }
 
     private fun fail(what: String, cause: Throwable? = null): Nothing =
         throw Compose2PdfException(
@@ -111,23 +119,6 @@ internal object ComposeSceneRenderer {
                 m.parameterTypes.withIndex().all { (i, p) -> paramTypes[i] == "*" || p.name == paramTypes[i] }
         } ?: fail("no $name(${paramTypes.joinToString()}) on ${owner.name}")
 
-    // invoke/newInstance wrap exceptions thrown by the target in InvocationTargetException; unwrap so
-    // Compose's own exceptions (e.g. IllegalArgumentException for a negative density) propagate with
-    // their real type, matching the pre-reflection direct calls.
-    private fun Method.call(receiver: Any?, vararg args: Any?): Any? =
-        try {
-            invoke(receiver, *args)
-        } catch (e: InvocationTargetException) {
-            throw e.targetException
-        }
-
-    private fun Constructor<*>.make(vararg args: Any?): Any =
-        try {
-            newInstance(*args)
-        } catch (e: InvocationTargetException) {
-            throw e.targetException
-        }
-
     private fun close(target: Any) {
         (target as? AutoCloseable)?.close() ?: fail("expected AutoCloseable, got ${target.javaClass.name}")
     }
@@ -143,12 +134,12 @@ internal object ComposeSceneRenderer {
         private val sceneRender by lazy { reflectMethod(composeSceneClass, "render", COMPOSE_CANVAS, "long") }
 
         override fun render(density: Density, size: IntSize, composeCanvas: Any, content: @Composable () -> Unit) {
-            val scene = sceneFactory.call(
+            val scene = sceneFactory.invokeUnwrapped(
                 null, density, LayoutDirection.Ltr, size, Dispatchers.Unconfined, platformContext, NO_OP,
             ) ?: fail("CanvasLayersComposeScene factory returned null")
             try {
-                sceneSetContent.call(scene, content)
-                sceneRender.call(scene, composeCanvas, 0L)
+                sceneSetContent.invokeUnwrapped(scene, content)
+                sceneRender.invokeUnwrapped(scene, composeCanvas, 0L)
             } finally {
                 close(scene)
             }
@@ -174,16 +165,16 @@ internal object ComposeSceneRenderer {
         private val sceneDraw by lazy { reflectMethod(composeSceneClass, "draw", COMPOSE_CANVAS) }
 
         override fun render(density: Density, size: IntSize, composeCanvas: Any, content: @Composable () -> Unit) {
-            val frameRecomposer = recomposerCtor.make(Dispatchers.Unconfined, NO_OP)
+            val frameRecomposer = recomposerCtor.newInstanceUnwrapped(Dispatchers.Unconfined, NO_OP)
             try {
-                val scene = sceneFactory.call(
+                val scene = sceneFactory.invokeUnwrapped(
                     null, frameRecomposer, density, LayoutDirection.Ltr, size, platformContext, NO_OP, NO_OP,
                 ) ?: fail("CanvasLayersComposeScene factory returned null")
                 try {
-                    sceneSetContent.call(scene, null, content) // CompositionContext defaults to null
-                    recomposerPerformFrame.call(frameRecomposer, 0L)
-                    sceneMeasureAndLayout.call(scene)
-                    sceneDraw.call(scene, composeCanvas)
+                    sceneSetContent.invokeUnwrapped(scene, null, content) // CompositionContext defaults to null
+                    recomposerPerformFrame.invokeUnwrapped(frameRecomposer, 0L)
+                    sceneMeasureAndLayout.invokeUnwrapped(scene)
+                    sceneDraw.invokeUnwrapped(scene, composeCanvas)
                 } finally {
                     close(scene)
                 }

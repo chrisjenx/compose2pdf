@@ -1,11 +1,18 @@
 [versions]
 kotlin = "2.4.0"
-compose-multiplatform = "1.11.1"
+compose-multiplatform = "1.12.2"
 pdfbox = "3.0.7"
 kotlinx-coroutines = "1.10.2"
 maven-publish = "0.34.0"
 
 [libraries]
+# Compose modules the library itself uses (runtime/ui/foundation, and material only for
+# ProvideTextStyle -> defaultFontFamily). Deliberately NOT the `desktop` umbrella, which also drags
+# ui-tooling-preview + ui-util into consumers. Skiko natives come from the consumer's own Compose.
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+compose-material = { module = "org.jetbrains.compose.material:material", version.ref = "compose-multiplatform" }
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }

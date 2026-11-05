@@ -13,6 +13,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+## 1.5.0
+
+### Added
+
+- **Compose Multiplatform 1.13 support** (tested on 1.13.0-beta02 / Skiko 0.156.1). The single binary is CI-tested on CMP 1.11.1, 1.12.2 and 1.13.0-beta02 — both the published jar and the full unit suite per version (also smoke-tested locally on 1.10.3 and 1.12.0-beta01).
+
+### Fixed
+
+- **Every render threw `Compose2PdfException` on CMP 1.13** ("No Compose UI graphics implementation is registered" / "Registered implementation is null, but required is SkikoGraphics"). CMP 1.13 stopped registering its Skiko graphics/text implementations through `ServiceLoader`; only `ImageComposeScene`/`ComposeContainer` register them now, and the vector renderer builds its scene directly. compose2pdf now registers them (by reflection — a no-op before 1.13) before every vector scene; raster scenes register themselves. Every render mode — vector, raster, auto-paginated, header/footer and manual pages — works again.
+- **Custom-font and system-font embedding on CMP 1.13.** Skiko 0.156 turned Skia's `FontStyle` into an inline value class (changing every JVM signature that uses it), Compose's internal font-cache members were renamed, and its default platform context now owns the font resolver, so compose2pdf creates a fresh one per render (keeping fonts isolated between renders and releasing them afterwards). Font capture handles all of these, so `Font(file)`/`Font(resource)` and system families keep embedding the exact fonts Compose laid text out with, with no Helvetica fallback.
+- **Raster mode threw `NoSuchMethodError` (`Image.encodeToData`) on CMP 1.12.** This was a binary mismatch with Skiko 0.150+ that also affected 1.4.0. Raster pages now convert bitmaps through Compose's stable `toAwtImage()` interop, which works on every supported version and skips a PNG encode/decode round-trip.
+
+### Changed
+
+- Built against the latest stable Compose Multiplatform, **1.12.2** (previously 1.11.1). Support policy: the latest stable minor, plus the previous stable minor and the next unreleased minor (newest pre-release).
+- The published POM depends only on the Compose modules compose2pdf uses — `runtime`, `ui`, `foundation` and `material` — instead of the `desktop` umbrella, so `ui-tooling-preview` and `ui-util` are no longer pulled into consumers.
+
 ## 1.4.0
 
 ### Fixed

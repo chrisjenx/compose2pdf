@@ -2,12 +2,8 @@ package com.chrisjenx.compose2pdf.internal
 
 import androidx.compose.ui.text.font.FontFamily
 import org.jetbrains.skia.FontMgr
-import org.jetbrains.skia.FontSlant
-import org.jetbrains.skia.FontStyle
 import org.jetbrains.skia.Typeface
 import org.jetbrains.skia.paragraph.FontCollection
-import java.util.Collections
-import java.util.WeakHashMap
 import kotlin.math.abs
 
 /**
@@ -23,16 +19,18 @@ import kotlin.math.abs
  * can [findTypeface]/[matchSystemTypeface] a family through the same Skia machinery the
  * paragraph shaper used.
  *
- * Capture is scoped to the render in flight: only the current resolver is retained (renders
- * are sequential — measurement, body, and slot passes all run before their SVG is converted),
- * so a typeface a *previous* render loaded under a family name can never shadow a *different*
- * font the current render loaded under the same name, and a completed render's FontCache is
- * released when the next render attaches.
+ * Capture is scoped to the render in flight: each top-level render gets its own resolver and
+ * FontCache (ComposeSceneRenderer creates a fresh PlatformContext per render — required from
+ * CMP 1.13, where the context owns the resolver), only the current one is retained, so a
+ * typeface a *previous* render loaded under a family name can never shadow a *different* font
+ * the current render loaded under the same name, and a completed render's FontCache is released
+ * when the next render attaches.
  *
  * This is a *soft-fail, name-coupled* reflective seam — a cousin of [ComposeSceneRenderer]'s,
  * but deliberately different in its failure mode: it hard-codes Compose-internal member names
- * (`getPlatformFontLoader$ui_text`, `getFontCache`, `typefacesCache`, `getMap$ui_text`,
- * `getFonts$ui_text`) and, on any reflection failure, degrades to FontResolver's other
+ * (`getPlatformFontLoader$<module>`, `getFontCache`, `typefacesCache`, `getMap$<module>`,
+ * `getFonts$<module>`; the module suffix changed in CMP 1.13 so it is matched loosely, and skiko's
+ * `FontStyle` access goes through [SkiaFontStyleCompat]) and, on any reflection failure, degrades to FontResolver's other
  * strategies (system lookup, standard-14) rather than throwing. Scene rendering has no such
  * fallback, so it fails fast; font embedding does, so it fails soft. Do not replace with
  * compile-time references.
@@ -46,16 +44,22 @@ internal object ComposeFontStack {
     // conversion. Replaced on the next render, releasing the prior render's font data.
     @Volatile private var current: FontFamily.Resolver? = null
 
-    // The typefaces and FontCollection extracted from a resolver's FontCache, reflected once
-    // and memoized so repeated cache-miss lookups within a render don't re-run reflection.
-    // WeakHashMap keys → the entry is released together with its resolver.
-    private class ResolverFonts(val typefaces: List<Typeface>, val collection: FontCollection?)
-    private val fontsByResolver = Collections.synchronizedMap(WeakHashMap<FontFamily.Resolver, ResolverFonts>())
+    // The typefaces and FontCollection extracted from a resolver's FontCache, reflected lazily and
+    // memoized so repeated cache-miss lookups don't re-run reflection. Tagged with the resolver it
+    // was read from, and cleared on every [attach] because a render's later scenes (body, header,
+    // footer) share its resolver and may load more fonts into it.
+    private class ResolverFonts(
+        val resolver: FontFamily.Resolver?,
+        val typefaces: List<Typeface>,
+        val collection: FontCollection?,
+    )
+    @Volatile private var currentFonts: ResolverFonts? = null
 
     @Volatile private var warned = false
 
     fun attach(resolver: FontFamily.Resolver) {
         current = resolver
+        currentFonts = null
     }
 
     /**
@@ -66,12 +70,16 @@ internal object ComposeFontStack {
     fun lookupCaptured(family: String, weight: Int, italic: Boolean): Typeface? {
         val resolver = current ?: return null
         val requested = family.trim().lowercase()
-        val matches = fontsOf(resolver).typefaces.filter { nameMatches(it, requested) }
-        if (matches.isEmpty()) return null
-        val candidates = matches
-            .filter { (it.fontStyle.slant != FontSlant.UPRIGHT) == italic }
-            .ifEmpty { matches }
-        return candidates.minByOrNull { abs(it.fontStyle.weight - weight) }
+        val matches = try {
+            fontsOf(resolver).typefaces
+                .filter { nameMatches(it, requested) }
+                .map { typeface -> typeface to SkiaFontStyleCompat.styleOf(typeface) }
+        } catch (t: Throwable) {
+            warnOnce(t)
+            return null
+        }
+        val candidates = matches.filter { (_, style) -> style.italic == italic }.ifEmpty { matches }
+        return candidates.minByOrNull { (_, style) -> abs(style.weight - weight) }?.first
     }
 
     /**
@@ -82,7 +90,7 @@ internal object ComposeFontStack {
         val resolver = current ?: return null
         val collection = fontsOf(resolver).collection ?: return null
         return try {
-            collection.findTypefaces(arrayOf(family), fontStyleOf(weight, italic))
+            SkiaFontStyleCompat.findTypefaces(collection, arrayOf(family), weight, italic)
                 .firstOrNull()
                 ?.takeIf { generic || nameMatches(it, family.trim().lowercase()) }
         } catch (t: Throwable) {
@@ -99,7 +107,7 @@ internal object ComposeFontStack {
      */
     fun matchSystemTypeface(family: String, weight: Int, italic: Boolean, generic: Boolean): Typeface? {
         return try {
-            FontMgr.default.matchFamilyStyle(family, fontStyleOf(weight, italic))
+            SkiaFontStyleCompat.matchFamilyStyle(FontMgr.default, family, weight, italic)
                 ?.takeIf { generic || nameMatches(it, family.trim().lowercase()) }
         } catch (t: Throwable) {
             warnOnce(t)
@@ -107,41 +115,52 @@ internal object ComposeFontStack {
         }
     }
 
-    private fun fontStyleOf(weight: Int, italic: Boolean): FontStyle =
-        FontStyle(weight, /* width = */ 5, if (italic) FontSlant.ITALIC else FontSlant.UPRIGHT)
-
-    /** The typefaces and FontCollection in [resolver]'s FontCache, reflected once and memoized. */
+    /** The typefaces and FontCollection in [resolver]'s FontCache, reflected once per render. */
     private fun fontsOf(resolver: FontFamily.Resolver): ResolverFonts =
-        fontsByResolver.getOrPut(resolver) {
-            try {
-                val fontCache = fontCacheOf(resolver) ?: return@getOrPut ResolverFonts(emptyList(), null)
-                ResolverFonts(typefacesIn(fontCache), collectionIn(fontCache))
-            } catch (t: Throwable) {
-                warnOnce(t)
-                ResolverFonts(emptyList(), null)
-            }
-        }
+        currentFonts?.takeIf { it.resolver === resolver } ?: try {
+            fontCacheOf(resolver)?.let { ResolverFonts(resolver, typefacesIn(it), collectionIn(it)) }
+                ?: ResolverFonts(resolver, emptyList(), null)
+        } catch (t: Throwable) {
+            warnOnce(t)
+            ResolverFonts(resolver, emptyList(), null)
+        }.also { currentFonts = it }
 
     private fun typefacesIn(fontCache: Any): List<Typeface> {
         val typefacesCache = fontCache.javaClass.getDeclaredField("typefacesCache")
             .apply { isAccessible = true }.get(fontCache) ?: return emptyList()
         val map = typefacesCache.javaClass.methods
-            .firstOrNull { it.name == "getMap\$ui_text" }?.invoke(typefacesCache) as? Map<*, *>
+            .firstOrNull { it.isInternalGetter("getMap") }?.invoke(typefacesCache) as? Map<*, *>
             ?: return emptyList()
-        return map.values.filterIsInstance<Typeface>().toList()
+        return map.values.filterIsInstance<Typeface>()
     }
 
     private fun collectionIn(fontCache: Any): FontCollection? =
         fontCache.javaClass.methods
-            .firstOrNull { it.name == "getFonts\$ui_text" }?.invoke(fontCache) as? FontCollection
+            .firstOrNull { it.isInternalGetter("getFonts") }?.invoke(fontCache) as? FontCollection
 
     private fun fontCacheOf(resolver: FontFamily.Resolver): Any? {
-        val loader = resolver.javaClass.methods
-            .firstOrNull { it.name == "getPlatformFontLoader\$ui_text" }?.invoke(resolver)
+        val platformLoader = resolver.javaClass.methods
+            .firstOrNull { it.isInternalGetter("getPlatformFontLoader") }?.invoke(resolver)
             ?: return null
-        return loader.javaClass.getDeclaredMethod("getFontCache")
-            .apply { isAccessible = true }.invoke(loader)
+        // Up to CMP 1.12 the platform loader IS the SkiaFontLoader owning the FontCache. From 1.13
+        // it is a PlatformFontLoaderAdapter wrapping it as `backend`; walk a bounded chain of
+        // backends to the first loader that declares getFontCache.
+        return generateSequence(platformLoader) { loader ->
+            loader.javaClass.methods.firstOrNull { it.name == "getBackend" && it.parameterCount == 0 }?.invoke(loader)
+        }.take(3).firstNotNullOfOrNull { loader ->
+            loader.javaClass.declaredMethods
+                .firstOrNull { it.name == "getFontCache" && it.parameterCount == 0 }
+                ?.apply { isAccessible = true }?.invoke(loader)
+        }
     }
+
+    /**
+     * A no-arg getter for a Kotlin `internal` member: JVM name `<base>$<module>`. The module suffix
+     * is matched loosely because it moved between versions (`$ui_text` up to CMP 1.12;
+     * `$org_jetbrains_compose_ui_ui_text` / `$org_jetbrains_compose_ui_ui_skiko` from 1.13).
+     */
+    private fun java.lang.reflect.Method.isInternalGetter(base: String): Boolean =
+        parameterCount == 0 && name.startsWith("$base$")
 
     private fun nameMatches(typeface: Typeface, requestedLower: String): Boolean =
         typeface.familyName.trim().lowercase() == requestedLower ||
@@ -157,6 +176,6 @@ internal object ComposeFontStack {
     /** Test hook — capture is process-scoped, so tests may need a clean slate. */
     fun clear() {
         current = null
-        fontsByResolver.clear()
+        currentFonts = null
     }
 }

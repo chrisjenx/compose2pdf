@@ -48,14 +48,14 @@ Requires **JDK 17+** and **Compose Desktop** (Compose Multiplatform 1.9+).
 
 [![Compose Compatibility](https://github.com/chrisjenx/compose2pdf/actions/workflows/compatibility.yml/badge.svg)](https://github.com/chrisjenx/compose2pdf/actions/workflows/compatibility.yml)
 
-Tested weekly against the 3 most recent Compose Multiplatform releases:
+Built against the latest stable Compose Multiplatform, and tested weekly against it, the previous stable minor, and the next unreleased minor (newest pre-release):
 
 <!-- BEGIN cmp-matrix -->
 | Compose Multiplatform | Kotlin | Status |
 |:----------------------|:-------|:-------|
-| 1.12.0-beta01 | 2.4.0 | CI tested |
-| **1.11.1** | 2.4.0 | CI tested (current) |
-| 1.10.3 | 2.4.0 | CI tested |
+| 1.13.0-beta02 | 2.4.0 | CI tested |
+| **1.12.2** | 2.4.0 | CI tested (current) |
+| 1.11.1 | 2.4.0 | CI tested |
 <!-- END cmp-matrix -->
 
 <sub>Generated from [`.github/compose-versions.json`](.github/compose-versions.json) by the update-compose-versions workflow — edit the JSON, not this table.</sub>

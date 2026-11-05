@@ -7,7 +7,7 @@ nav_order: 3
 
 [![Compose Compatibility](https://github.com/chrisjenx/compose2pdf/actions/workflows/compatibility.yml/badge.svg)](https://github.com/chrisjenx/compose2pdf/actions/workflows/compatibility.yml)
 
-compose2pdf is tested weekly against the 3 most recent Compose Multiplatform releases on macOS and Linux.
+compose2pdf is built against the latest stable Compose Multiplatform release, and supports the previous stable minor and the next unreleased minor (its newest pre-release). All of them are tested weekly on macOS and Linux with the one published binary.
 
 ---
 
@@ -16,13 +16,13 @@ compose2pdf is tested weekly against the 3 most recent Compose Multiplatform rel
 <!-- BEGIN cmp-matrix -->
 | Compose Multiplatform | Kotlin | Status |
 |:----------------------|:-------|:-------|
-| 1.12.0-beta01 | 2.4.0 | CI tested |
-| **1.11.1** | 2.4.0 | CI tested (current) |
-| 1.10.3 | 2.4.0 | CI tested |
+| 1.13.0-beta02 | 2.4.0 | CI tested |
+| **1.12.2** | 2.4.0 | CI tested (current) |
+| 1.11.1 | 2.4.0 | CI tested |
 <!-- END cmp-matrix -->
 
 {: .note }
-This table is generated from [`.github/compose-versions.json`](https://github.com/chrisjenx/compose2pdf/blob/main/.github/compose-versions.json) and updated weekly by the [update-compose-versions workflow](https://github.com/chrisjenx/compose2pdf/actions/workflows/update-compose-versions.yml), which discovers the 3 most recent CMP releases and runs the full test suite against each. The **current** row is the version the library itself pins. Edit `compose-versions.json`, not this table.
+This table is generated from [`.github/compose-versions.json`](https://github.com/chrisjenx/compose2pdf/blob/main/.github/compose-versions.json) and updated weekly by the [update-compose-versions workflow](https://github.com/chrisjenx/compose2pdf/actions/workflows/update-compose-versions.yml), which applies that policy (previous stable + latest stable + next pre-release) and re-pins the build to the latest stable; CI then runs the published binary and the full unit suite against each. The **current** row is the version the library itself pins. Edit `compose-versions.json`, not this table.
 
 ---
 

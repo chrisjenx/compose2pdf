@@ -5,8 +5,16 @@ plugins {
     alias(libs.plugins.maven.publish)
 }
 
+// `compose.desktop.currentOs` is deprecated in CMP 1.13 (its desktop artifacts bundle Skiko natives
+// for every OS), but these tests also build on CMP <= 1.12 (the stable base, and the compat matrix's
+// per-version unit-test step), where explicit ui/foundation/material ship NO Skiko natives.
+@Suppress("DEPRECATION")
 dependencies {
-    implementation(compose.desktop.common)
+    // Only the Compose modules compose2pdf uses — not the `desktop` umbrella (see libs.versions.toml).
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material)
     implementation(libs.pdfbox)
 
     testImplementation(compose.desktop.currentOs)
