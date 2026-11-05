@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -31,8 +33,6 @@ import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDBorderStyleDictionary
 import java.awt.image.BufferedImage
-import java.io.ByteArrayInputStream
-import javax.imageio.ImageIO
 
 internal object PdfRenderer {
 
@@ -60,6 +60,7 @@ internal object PdfRenderer {
         footer: (@Composable (PdfPageInfo) -> Unit)? = null,
         content: @Composable () -> Unit,
     ): PDDocument {
+        SkikoComposeRuntime.ensureRegistered()
         if (header == null && footer == null) {
             // Fast path: exactly the pre-slots pipeline (fidelity guarantee — see CLAUDE.md gotchas).
             return when (pagination) {
@@ -453,6 +454,7 @@ internal object PdfRenderer {
         content: @Composable (pageIndex: Int) -> Unit,
     ): PDDocument {
         require(pageCount > 0) { "pageCount must be positive, was $pageCount" }
+        SkikoComposeRuntime.ensureRegistered()
         return when (mode) {
             RenderMode.VECTOR -> renderVector(pageCount, config, density, defaultFontFamily, content)
             RenderMode.RASTER -> renderRaster(pageCount, config, density, defaultFontFamily, content)
@@ -685,11 +687,13 @@ internal object PdfRenderer {
         }
     }
 
-    private fun skiaImageToBufferedImage(image: org.jetbrains.skia.Image): BufferedImage {
-        val data = image.encodeToData()
-            ?: throw Compose2PdfException("Failed to encode Skia image to PNG data")
-        return ImageIO.read(ByteArrayInputStream(data.bytes))
-    }
+    // Converts via Compose's stable public desktop interop rather than Skia's Image.encodeToData:
+    // encodeToData's JVM signature differs between skiko 0.144 (CMP 1.11: (format, quality)) and
+    // 0.150+ (CMP 1.12+: (format, quality, ?)), so any typed call — including its synthetic
+    // `$default` — throws NoSuchMethodError on one side of the single-binary compat range. Also
+    // skips a PNG encode/decode round-trip.
+    private fun skiaImageToBufferedImage(image: org.jetbrains.skia.Image): BufferedImage =
+        image.toComposeImageBitmap().toAwtImage()
 
     private fun addBitmapPage(
         doc: PDDocument,

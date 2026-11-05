@@ -1,11 +1,17 @@
 [versions]
 kotlin = "2.4.0"
-compose-multiplatform = "1.11.1"
+compose-multiplatform = "1.13.0-beta02"
 pdfbox = "3.0.7"
 kotlinx-coroutines = "1.10.2"
 maven-publish = "0.34.0"
 
 [libraries]
+# Explicit Compose coordinates: CMP 1.13 deprecates the compose.desktop.common / currentOs accessors
+# (desktop artifacts now carry Skiko natives for every OS; packaging strips the non-target ones).
+compose-desktop = { module = "org.jetbrains.compose.desktop:desktop", version.ref = "compose-multiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+compose-material = { module = "org.jetbrains.compose.material:material", version.ref = "compose-multiplatform" }
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }

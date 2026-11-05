@@ -40,6 +40,9 @@ internal object ComposeSceneRenderer {
         density: Density,
         content: @Composable () -> Unit,
     ) {
+        // Every vector scene funnels through here; CMP 1.13+ needs Skiko registered before the
+        // canvas wrapper or scene touches the graphics registry (no-op on earlier versions).
+        SkikoComposeRuntime.ensureRegistered()
         val composeCanvas: Any = canvas.asComposeCanvas()
         // The factory takes a boxed IntSize (mangled name, but the param is the value-class object,
         // not an unboxed long); passing it through Any args boxes it to the IntSize wrapper.

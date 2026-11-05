@@ -5,8 +5,13 @@ plugins {
     alias(libs.plugins.maven.publish)
 }
 
+// `compose.desktop.currentOs` is deprecated in CMP 1.13 (its desktop artifacts bundle Skiko natives
+// for every OS), but CI's nextdriver-guard also recompiles + runs these tests on CMP 1.12, where the
+// explicit ui/foundation/material modules ship NO Skiko natives. currentOs works on both.
+@Suppress("DEPRECATION")
 dependencies {
-    implementation(compose.desktop.common)
+    // Same coordinate the deprecated `compose.desktop.common` accessor resolved to.
+    implementation(libs.compose.desktop)
     implementation(libs.pdfbox)
 
     testImplementation(compose.desktop.currentOs)

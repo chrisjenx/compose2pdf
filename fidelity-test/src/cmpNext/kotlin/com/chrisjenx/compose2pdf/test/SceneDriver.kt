@@ -28,6 +28,7 @@ internal fun drawComposeSceneToCanvas(
     density: Density,
     content: @Composable () -> Unit,
 ) {
+    registerSkikoIfNeeded()
     val frameRecomposer = FrameRecomposer(Dispatchers.Unconfined)
     try {
         val scene = CanvasLayersComposeScene(
@@ -46,5 +47,24 @@ internal fun drawComposeSceneToCanvas(
     } finally {
         // Nested so the recomposer is always released, even if scene construction or close throws.
         frameRecomposer.close()
+    }
+}
+
+/**
+ * CMP 1.13+ no longer registers Skiko graphics/text via ServiceLoader; only ImageComposeScene /
+ * ComposeContainer call `registerSkikoComposeImplementation()`, so a bare CanvasLayersComposeScene
+ * must. Reflective (absent before 1.13, which this variant also covers) and idempotent — mirrors
+ * the production `SkikoComposeRuntime`.
+ */
+private fun registerSkikoIfNeeded() {
+    val cls = try {
+        Class.forName("androidx.compose.ui.platform.ComposeUiSkikoRuntime_nonAndroidKt")
+    } catch (e: ClassNotFoundException) {
+        return
+    }
+    try {
+        cls.getMethod("registerSkikoComposeImplementation").invoke(null)
+    } catch (e: java.lang.reflect.InvocationTargetException) {
+        throw e.targetException
     }
 }

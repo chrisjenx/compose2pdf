@@ -13,6 +13,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+## 1.5.0
+
+### Added
+
+- **Compose Multiplatform 1.13 support** (tested on 1.13.0-beta02 / Skiko 0.156.1). The library is now built against CMP 1.13.0-beta02; the same single binary is CI-tested on CMP 1.11.1, 1.12.2 and 1.13.0-beta02 (and was also smoke-tested locally on 1.10.3 and 1.12.0-beta01).
+
+### Fixed
+
+- **Every render threw `Compose2PdfException` on CMP 1.13** ("No Compose UI graphics implementation is registered" / "Registered implementation is null, but required is SkikoGraphics"). CMP 1.13 stopped registering its Skiko graphics/text implementations through `ServiceLoader`; only `ImageComposeScene`/`ComposeContainer` register them now, and the vector renderer builds its scene directly. compose2pdf now registers them (idempotently, by reflection — a no-op before 1.13) before every render, in vector, raster, auto-paginated, header/footer and manual-page modes.
+- **Custom-font and system-font embedding on CMP 1.13.** Skiko 0.156 turned Skia's `FontStyle` into an inline value class (changing every JVM signature that uses it), Compose's internal font-cache members were renamed, and all renders now share one process-wide font resolver. Font capture handles all of these, so `Font(file)`/`Font(resource)` and system families keep embedding the exact fonts Compose laid text out with, with no Helvetica fallback.
+- **Raster mode threw `NoSuchMethodError` (`Image.encodeToData`) on CMP 1.12.** This was a binary mismatch with Skiko 0.150+ that also affected 1.4.0. Raster pages now convert bitmaps through Compose's stable `toAwtImage()` interop, which works on every supported version and skips a PNG encode/decode round-trip.
+
+### Changed
+
+- The published POM now depends on Compose `desktop` **1.13.0-beta02** (previously 1.11.1). Gradle conflict resolution will upgrade consumers on an older Compose to this pre-release unless they pin their Compose version (e.g. with a `strictly` constraint); compose2pdf itself runs on 1.10+ either way.
+
 ## 1.4.0
 
 ### Fixed
