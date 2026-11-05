@@ -3,6 +3,7 @@ package com.chrisjenx.compose2pdf
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.Text
 import java.io.ByteArrayOutputStream
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -19,14 +20,24 @@ import kotlin.test.Test
  */
 class SkikoRegistrationTest {
 
+    // Raster auto-paginated / header-footer cases measure through the vector scene first, so only
+    // the raster single-page and manual-page cases prove ImageComposeScene registers on its own.
+
     @BeforeTest
-    fun clearRegistration() {
+    fun clearRegistration() = skikoRuntime("clearSkikoComposeImplementation")
+
+    // The registry is process-global: restore it so a failing case can't leave later test classes
+    // in this JVM unregistered (which would mask their real failures).
+    @AfterTest
+    fun restoreRegistration() = skikoRuntime("registerSkikoComposeImplementation")
+
+    private fun skikoRuntime(function: String) {
         val runtime = try {
             Class.forName("androidx.compose.ui.platform.ComposeUiSkikoRuntime_nonAndroidKt")
         } catch (e: ClassNotFoundException) {
-            return // CMP < 1.13: nothing to clear
+            return // CMP < 1.13: no explicit registry
         }
-        runtime.getMethod("clearSkikoComposeImplementation").invoke(null)
+        runtime.getMethod(function).invoke(null)
     }
 
     @Test

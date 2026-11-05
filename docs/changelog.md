@@ -21,13 +21,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
-- **Every render threw `Compose2PdfException` on CMP 1.13** ("No Compose UI graphics implementation is registered" / "Registered implementation is null, but required is SkikoGraphics"). CMP 1.13 stopped registering its Skiko graphics/text implementations through `ServiceLoader`; only `ImageComposeScene`/`ComposeContainer` register them now, and the vector renderer builds its scene directly. compose2pdf now registers them (idempotently, by reflection — a no-op before 1.13) before every render, in vector, raster, auto-paginated, header/footer and manual-page modes.
-- **Custom-font and system-font embedding on CMP 1.13.** Skiko 0.156 turned Skia's `FontStyle` into an inline value class (changing every JVM signature that uses it), Compose's internal font-cache members were renamed, and all renders now share one process-wide font resolver. Font capture handles all of these, so `Font(file)`/`Font(resource)` and system families keep embedding the exact fonts Compose laid text out with, with no Helvetica fallback.
+- **Every render threw `Compose2PdfException` on CMP 1.13** ("No Compose UI graphics implementation is registered" / "Registered implementation is null, but required is SkikoGraphics"). CMP 1.13 stopped registering its Skiko graphics/text implementations through `ServiceLoader`; only `ImageComposeScene`/`ComposeContainer` register them now, and the vector renderer builds its scene directly. compose2pdf now registers them (by reflection — a no-op before 1.13) before every vector scene; raster scenes register themselves. Every render mode — vector, raster, auto-paginated, header/footer and manual pages — works again.
+- **Custom-font and system-font embedding on CMP 1.13.** Skiko 0.156 turned Skia's `FontStyle` into an inline value class (changing every JVM signature that uses it), Compose's internal font-cache members were renamed, and its default platform context now owns the font resolver, so compose2pdf creates a fresh one per render (keeping fonts isolated between renders and releasing them afterwards). Font capture handles all of these, so `Font(file)`/`Font(resource)` and system families keep embedding the exact fonts Compose laid text out with, with no Helvetica fallback.
 - **Raster mode threw `NoSuchMethodError` (`Image.encodeToData`) on CMP 1.12.** This was a binary mismatch with Skiko 0.150+ that also affected 1.4.0. Raster pages now convert bitmaps through Compose's stable `toAwtImage()` interop, which works on every supported version and skips a PNG encode/decode round-trip.
 
 ### Changed
 
-- The published POM now depends on Compose `desktop` **1.13.0-beta02** (previously 1.11.1). Gradle conflict resolution will upgrade consumers on an older Compose to this pre-release unless they pin their Compose version (e.g. with a `strictly` constraint); compose2pdf itself runs on 1.10+ either way.
+- The published POM now depends on Compose `desktop` **1.13.0-beta02** (previously 1.11.1). Gradle conflict resolution will upgrade consumers on an older Compose to this pre-release unless they pin their Compose version (e.g. with a `strictly` constraint); compose2pdf itself runs on every CI-tested version (1.11+) either way.
 
 ## 1.4.0
 

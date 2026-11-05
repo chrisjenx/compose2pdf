@@ -67,12 +67,26 @@ internal object ComposeSceneRenderer {
         classOrNull(COMPOSE_SCENE) ?: fail("$COMPOSE_SCENE not found")
     }
 
-    // PlatformContext.Empty is a stateless `class` (public no-arg ctor) in both 1.11 and 1.12; one
-    // shared empty instance is reused across renders (a scene keeps no mutable state on it).
-    private val platformContext: Any by lazy {
+    private val platformContextCtor by lazy {
         val cls = classOrNull(PLATFORM_CONTEXT_EMPTY) ?: fail("$PLATFORM_CONTEXT_EMPTY not found")
-        cls.getDeclaredConstructor().newInstanceUnwrapped()
+        cls.getDeclaredConstructor()
     }
+
+    // ONE PlatformContext.Empty per top-level render, shared by that render's scenes (measurement,
+    // body, header/footer bands) and replaced by [beginRender]. It must not be process-wide: from
+    // CMP 1.13 Empty owns a lazily created FontFamily.Resolver + FontCache, so a cached instance
+    // would make every render share one FontCache (unbounded growth, 60s access-based eviction,
+    // and same-named fonts from earlier renders shadowing the current one in ComposeFontStack).
+    // Per render — not per scene — so the font capture sees every font the render's scenes loaded.
+    @Volatile private var renderPlatformContext: Any? = null
+
+    /** Starts a new top-level render: its scenes get a fresh PlatformContext (and font stack). */
+    fun beginRender() {
+        renderPlatformContext = null
+    }
+
+    private val platformContext: Any
+        get() = renderPlatformContext ?: platformContextCtor.newInstanceUnwrapped().also { renderPlatformContext = it }
 
     private fun fail(what: String, cause: Throwable? = null): Nothing =
         throw Compose2PdfException(

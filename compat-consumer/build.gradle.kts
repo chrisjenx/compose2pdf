@@ -18,6 +18,7 @@ dependencies {
     implementation("com.chrisjenx:compose2pdf:$compose2pdfVersion")
     // Deprecated in CMP 1.13, but this build targets every matrix version (1.11+), where the
     // explicit ui/foundation/material modules carry no Skiko natives; currentOs works on all.
+    @Suppress("DEPRECATION")
     implementation(compose.desktop.currentOs)
     // Smoke checks font embedding (compose2pdf only exposes PDFBox at runtime scope).
     implementation("org.apache.pdfbox:pdfbox:3.0.7")

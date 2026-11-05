@@ -43,11 +43,12 @@ fun main() {
         Text("system sans-serif", style = TextStyle(fontFamily = FontFamily.SansSerif))
     }
     checkPdf("system fonts", systemPdf)
-    val notEmbedded = Loader.loadPDF(systemPdf).use { doc ->
-        doc.pages.flatMap { page ->
-            page.resources.fontNames.map { page.resources.getFont(it) }.filterNot { it.isEmbedded }.map { it.name }
-        }
+    val fonts = Loader.loadPDF(systemPdf).use { doc ->
+        doc.pages.flatMap { page -> page.resources.fontNames.mapNotNull { page.resources.getFont(it) } }
+            .map { it.name to it.isEmbedded }
     }
+    check(fonts.isNotEmpty()) { "system-font PDF carries no fonts at all (text dropped?)" }
+    val notEmbedded = fonts.filterNot { it.second }.map { it.first }
     check(notEmbedded.isEmpty()) { "system-font text fell back to non-embedded fonts $notEmbedded (Skia FontStyle seam broken?)" }
 
     println("compat-consumer OK: vector, raster, manual pages and embedded system fonts")

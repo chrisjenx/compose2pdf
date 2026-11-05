@@ -4,11 +4,12 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+// currentOs is deprecated in CMP 1.13 but kept: the pinned base can be a stable <= 1.12 (the weekly
+// update workflow pins the highest STABLE), where the explicit modules ship no Skiko natives.
+@Suppress("DEPRECATION")
 dependencies {
     testImplementation(project(":compose2pdf"))
-    testImplementation(libs.compose.ui)
-    testImplementation(libs.compose.foundation)
-    testImplementation(libs.compose.material)
+    testImplementation(compose.desktop.currentOs)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.pdfbox)

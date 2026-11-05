@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontFamily
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.ui.text.TextStyle
+import com.chrisjenx.compose2pdf.Compose2PdfException
 import com.chrisjenx.compose2pdf.LocalPdfLinkCollector
 import com.chrisjenx.compose2pdf.LocalPdfPageConfig
 import com.chrisjenx.compose2pdf.PdfLinkAnnotation
@@ -59,6 +61,7 @@ internal object PdfRenderer {
         footer: (@Composable (PdfPageInfo) -> Unit)? = null,
         content: @Composable () -> Unit,
     ): PDDocument {
+        ComposeSceneRenderer.beginRender()
         if (header == null && footer == null) {
             // Fast path: exactly the pre-slots pipeline (fidelity guarantee — see CLAUDE.md gotchas).
             return when (pagination) {
@@ -452,6 +455,7 @@ internal object PdfRenderer {
         content: @Composable (pageIndex: Int) -> Unit,
     ): PDDocument {
         require(pageCount > 0) { "pageCount must be positive, was $pageCount" }
+        ComposeSceneRenderer.beginRender()
         return when (mode) {
             RenderMode.VECTOR -> renderVector(pageCount, config, density, defaultFontFamily, content)
             RenderMode.RASTER -> renderRaster(pageCount, config, density, defaultFontFamily, content)
@@ -688,9 +692,21 @@ internal object PdfRenderer {
     // encodeToData's JVM signature differs between skiko 0.144 (CMP 1.11: (format, quality)) and
     // 0.150+ (CMP 1.12+: (format, quality, ?)), so any typed call — including its synthetic
     // `$default` — throws NoSuchMethodError on one side of the single-binary compat range. Also
-    // skips a PNG encode/decode round-trip.
-    private fun skiaImageToBufferedImage(image: org.jetbrains.skia.Image): BufferedImage =
-        image.toComposeImageBitmap().toAwtImage()
+    // skips a PNG encode/decode round-trip. The intermediate ImageBitmap wraps a full-size native
+    // Skia Bitmap (auto-raster bitmaps can be hundreds of MB); toAwtImage copies the pixels, so the
+    // native copy is closed right away instead of waiting for GC finalization.
+    private fun skiaImageToBufferedImage(image: org.jetbrains.skia.Image): BufferedImage {
+        val bitmap = image.toComposeImageBitmap()
+        return try {
+            bitmap.toAwtImage()
+        } catch (e: IllegalArgumentException) {
+            // Keep the old encode path's contract: an internal conversion failure is a rendering
+            // error, not a caller precondition (renderToPdf passes IllegalArgumentException through).
+            throw Compose2PdfException("Failed to convert the rendered bitmap: ${e.message}", e)
+        } finally {
+            bitmap.asSkiaBitmap().close()
+        }
+    }
 
     private fun addBitmapPage(
         doc: PDDocument,

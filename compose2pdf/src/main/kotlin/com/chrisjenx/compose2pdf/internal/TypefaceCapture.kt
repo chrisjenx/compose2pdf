@@ -19,11 +19,12 @@ import kotlin.math.abs
  * can [findTypeface]/[matchSystemTypeface] a family through the same Skia machinery the
  * paragraph shaper used.
  *
- * Capture is scoped to the render in flight: only the current resolver is retained (renders
- * are sequential — measurement, body, and slot passes all run before their SVG is converted),
- * so a typeface a *previous* render loaded under a family name can never shadow a *different*
- * font the current render loaded under the same name, and a completed render's FontCache is
- * released when the next render attaches.
+ * Capture is scoped to the render in flight: each top-level render gets its own resolver and
+ * FontCache (ComposeSceneRenderer creates a fresh PlatformContext per render — required from
+ * CMP 1.13, where the context owns the resolver), only the current one is retained, so a
+ * typeface a *previous* render loaded under a family name can never shadow a *different* font
+ * the current render loaded under the same name, and a completed render's FontCache is released
+ * when the next render attaches.
  *
  * This is a *soft-fail, name-coupled* reflective seam — a cousin of [ComposeSceneRenderer]'s,
  * but deliberately different in its failure mode: it hard-codes Compose-internal member names
@@ -43,11 +44,15 @@ internal object ComposeFontStack {
     // conversion. Replaced on the next render, releasing the prior render's font data.
     @Volatile private var current: FontFamily.Resolver? = null
 
-    // The typefaces and FontCollection extracted from [current]'s FontCache, reflected lazily and
-    // memoized so repeated cache-miss lookups within a render don't re-run reflection. Cleared on
-    // every [attach]: from CMP 1.13 all renders share ONE process-wide resolver (and FontCache), so
-    // a memo taken by an earlier render would hide fonts this render loaded.
-    private class ResolverFonts(val typefaces: List<Typeface>, val collection: FontCollection?)
+    // The typefaces and FontCollection extracted from a resolver's FontCache, reflected lazily and
+    // memoized so repeated cache-miss lookups don't re-run reflection. Tagged with the resolver it
+    // was read from, and cleared on every [attach] because a render's later scenes (body, header,
+    // footer) share its resolver and may load more fonts into it.
+    private class ResolverFonts(
+        val resolver: FontFamily.Resolver?,
+        val typefaces: List<Typeface>,
+        val collection: FontCollection?,
+    )
     @Volatile private var currentFonts: ResolverFonts? = null
 
     @Volatile private var warned = false
@@ -59,9 +64,7 @@ internal object ComposeFontStack {
 
     /**
      * Best typeface the current render loaded for [family], preferring exact italic match
-     * then nearest weight, then the most recently used (with a shared FontCache — CMP 1.13+ —
-     * the cache can also hold same-named fonts from earlier renders; the render in flight
-     * touched its own fonts last). Covers resource/file fonts that exist only in the FontCache under
+     * then nearest weight. Covers resource/file fonts that exist only in the FontCache under
      * opaque keys, so a plain family-name query can't find them.
      */
     fun lookupCaptured(family: String, weight: Int, italic: Boolean): Typeface? {
@@ -114,12 +117,12 @@ internal object ComposeFontStack {
 
     /** The typefaces and FontCollection in [resolver]'s FontCache, reflected once per render. */
     private fun fontsOf(resolver: FontFamily.Resolver): ResolverFonts =
-        currentFonts ?: try {
-            fontCacheOf(resolver)?.let { ResolverFonts(typefacesIn(it), collectionIn(it)) }
-                ?: ResolverFonts(emptyList(), null)
+        currentFonts?.takeIf { it.resolver === resolver } ?: try {
+            fontCacheOf(resolver)?.let { ResolverFonts(resolver, typefacesIn(it), collectionIn(it)) }
+                ?: ResolverFonts(resolver, emptyList(), null)
         } catch (t: Throwable) {
             warnOnce(t)
-            ResolverFonts(emptyList(), null)
+            ResolverFonts(resolver, emptyList(), null)
         }.also { currentFonts = it }
 
     private fun typefacesIn(fontCache: Any): List<Typeface> {
@@ -128,17 +131,7 @@ internal object ComposeFontStack {
         val map = typefacesCache.javaClass.methods
             .firstOrNull { it.isInternalGetter("getMap") }?.invoke(typefacesCache) as? Map<*, *>
             ?: return emptyList()
-        // Most recently accessed first, so same-name/same-style ties resolve to the current
-        // render's font (stable minBy in lookupCaptured keeps the first). Best-effort: without
-        // the access-time map the cache's own order is kept.
-        val accessTime = typefacesCache.javaClass.methods
-            .firstOrNull { it.isInternalGetter("getAccessTime") }?.invoke(typefacesCache) as? Map<*, *>
-        val entries = if (accessTime == null) {
-            map.entries.toList()
-        } else {
-            map.entries.sortedByDescending { (accessTime[it.key] as? Long) ?: Long.MIN_VALUE }
-        }
-        return entries.mapNotNull { it.value as? Typeface }
+        return map.values.filterIsInstance<Typeface>()
     }
 
     private fun collectionIn(fontCache: Any): FontCollection? =

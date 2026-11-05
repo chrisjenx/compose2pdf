@@ -9,11 +9,12 @@ application {
     mainClass.set("com.chrisjenx.compose2pdf.examples.MainKt")
 }
 
+// currentOs is deprecated in CMP 1.13 but kept: the pinned base can be a stable <= 1.12 (the weekly
+// update workflow pins the highest STABLE), where the explicit modules ship no Skiko natives.
+@Suppress("DEPRECATION")
 dependencies {
     implementation(project(":compose2pdf"))
-    implementation(libs.compose.ui)
-    implementation(libs.compose.foundation)
-    implementation(libs.compose.material)
+    implementation(compose.desktop.currentOs)
     implementation(libs.pdfbox)
 }
 

@@ -17,9 +17,10 @@ import java.lang.reflect.Modifier
  *
  * The function does not exist before 1.13 (registration was implicit), and compose2pdf ships ONE
  * binary spanning 1.11+, so it is resolved by reflection: present → invoked, absent → no-op.
- * Registering the same instances again is a no-op in Compose, so [ensureRegistered] runs before every
- * render rather than once per process — that keeps it correct even if something in the host
- * process calls `clearSkikoComposeImplementation()` between renders.
+ * Re-registering the identical instances is a no-op in Compose, so [ensureRegistered] runs before
+ * every vector scene rather than once per process — that keeps it correct even if something in
+ * the host process calls `clearSkikoComposeImplementation()` between renders. A host that
+ * registered its own (different) implementation is left alone.
  */
 internal object SkikoComposeRuntime {
 
@@ -38,6 +39,13 @@ internal object SkikoComposeRuntime {
     }
 
     fun ensureRegistered() {
-        register?.invokeUnwrapped(null)
+        val method = register ?: return
+        try {
+            method.invokeUnwrapped(null)
+        } catch (e: IllegalStateException) {
+            // Compose's registries throw when a DIFFERENT implementation is already registered
+            // (e.g. the host app registered its own). Something is registered then, which is all a
+            // scene needs; if nothing were, the scene itself fails with Compose's own clear error.
+        }
     }
 }
