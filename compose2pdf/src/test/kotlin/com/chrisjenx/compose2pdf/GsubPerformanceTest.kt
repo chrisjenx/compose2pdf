@@ -12,7 +12,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chrisjenx.compose2pdf.internal.FontResolver
 import com.chrisjenx.compose2pdf.internal.SkiaTypefaceEmbedder
+import com.chrisjenx.compose2pdf.internal.Type0FontLoader
+import org.apache.fontbox.ttf.TTFParser
 import org.apache.fontbox.ttf.model.GsubData
+import org.apache.pdfbox.io.RandomAccessReadBuffer
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.contentstream.operator.Operator
 import org.apache.pdfbox.cos.COSString
@@ -28,6 +31,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -65,6 +69,26 @@ class GsubPerformanceTest {
             val font = SkiaTypefaceEmbedder.embed(doc, skiaInter())
             assertTrue(font is PDType0Font, "expected embedded PDType0Font, got $font")
             assertSame(GsubData.NO_DATA_FOUND, font.gsubData, "PDFBox must not re-apply GSUB to shaped text")
+        }
+    }
+
+    /**
+     * The flag alone hides GSUB from showText, but TTFParser still parses the table eagerly
+     * (the per-document load cost). The bytes PDFBox parses must not contain GSUB at all.
+     */
+    @Test
+    fun `GSUB table is stripped from font bytes before parsing`() {
+        val original = TTFParser().parse(RandomAccessReadBuffer(interBytes()))
+        val stripped = TTFParser().parse(RandomAccessReadBuffer(Type0FontLoader.withoutGsub(interBytes())))
+        try {
+            assertTrue("GSUB" in original.tableMap, "fixture must carry GSUB for this test to discriminate")
+            assertFalse("GSUB" in stripped.tableMap, "GSUB must be stripped before PDFBox parses the font")
+            assertEquals(original.numberOfGlyphs, stripped.numberOfGlyphs)
+            val (o, s) = original.getUnicodeCmapLookup()!! to stripped.getUnicodeCmapLookup()!!
+            for (cp in 0x20..0x24F) assertEquals(o.getGlyphId(cp), s.getGlyphId(cp), "cmap mismatch at U+%04X".format(cp))
+            for (gid in 0 until original.numberOfGlyphs) assertEquals(original.getAdvanceWidth(gid), stripped.getAdvanceWidth(gid))
+        } finally {
+            original.close(); stripped.close()
         }
     }
 
