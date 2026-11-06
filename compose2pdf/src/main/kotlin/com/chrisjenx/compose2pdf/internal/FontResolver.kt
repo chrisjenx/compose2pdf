@@ -2,7 +2,6 @@ package com.chrisjenx.compose2pdf.internal
 
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.font.PDFont
-import org.apache.pdfbox.pdmodel.font.PDType0Font
 import org.apache.pdfbox.pdmodel.font.PDType1Font
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts
 import java.io.File
@@ -54,9 +53,9 @@ internal object FontResolver {
         for (fam in families) {
             val path = bundledFontPath(fam, bold, italic) ?: continue
             loadOrReuse(fontCache, key, "bundled:$path") {
-                Thread.currentThread().contextClassLoader?.getResourceAsStream(path)?.use { stream ->
+                bundledFontBytes(path)?.let { bytes ->
                     try {
-                        PDType0Font.load(doc, stream)
+                        Type0FontLoader.load(doc, bytes)
                     } catch (e: Exception) {
                         logger.warning("Failed to load bundled font '$fam' (bold=$bold, italic=$italic): ${e.message}")
                         null
@@ -88,7 +87,7 @@ internal object FontResolver {
             val fontFile = resolveFile(fam, bold, italic) ?: continue
             loadOrReuse(fontCache, key, "file:${fontFile.path}") {
                 try {
-                    PDType0Font.load(doc, fontFile)
+                    Type0FontLoader.load(doc, fileFontBytes(fontFile))
                 } catch (e: Exception) {
                     logger.fine("Failed to load system font '$fam' from ${fontFile.path}: ${e.message}")
                     null
@@ -138,6 +137,23 @@ internal object FontResolver {
     ): PDFont? = loadOrReuse(fontCache, resolutionKey, "typeface:${typeface.uniqueId}") {
         SkiaTypefaceEmbedder.embed(doc, typeface)
     }
+
+    // GSUB-free font bytes, shared across documents (see Type0FontLoader for why only bytes).
+    private val bundledBytesCache = ConcurrentHashMap<String, Optional<ByteArray>>()
+    private val fileBytesCache = ConcurrentHashMap<String, ByteArray>()
+
+    private fun bundledFontBytes(path: String): ByteArray? = bundledBytesCache.getOrPut(path) {
+        Optional.ofNullable(
+            Thread.currentThread().contextClassLoader?.getResourceAsStream(path)?.use { it.readBytes() }
+                ?.let(Type0FontLoader::withoutGsub),
+        )
+    }.orElse(null)
+
+    // Keyed by path + size + mtime so a font replaced on disk is re-read.
+    private fun fileFontBytes(file: File): ByteArray =
+        fileBytesCache.getOrPut("${file.path}|${file.length()}|${file.lastModified()}") {
+            Type0FontLoader.withoutGsub(file.readBytes())
+        }
 
     // Families already warned about falling back to a standard-14 font (avoid log spam)
     private val warnedFallbacks = ConcurrentHashMap.newKeySet<String>()
