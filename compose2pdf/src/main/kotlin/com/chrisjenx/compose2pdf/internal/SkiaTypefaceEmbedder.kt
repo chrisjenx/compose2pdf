@@ -2,10 +2,7 @@ package com.chrisjenx.compose2pdf.internal
 
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.font.PDFont
-import org.apache.pdfbox.pdmodel.font.PDType0Font
 import org.jetbrains.skia.Typeface
-import java.io.ByteArrayOutputStream
-import java.io.DataOutputStream
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
@@ -46,7 +43,7 @@ internal object SkiaTypefaceEmbedder {
             )
         }.orElse(null) ?: return null
         return try {
-            PDType0Font.load(doc, bytes.inputStream())
+            Type0FontLoader.load(doc, bytes)
         } catch (e: Exception) {
             logger.fine("PDFBox rejected rebuilt font '${typeface.familyName}': ${e.message}")
             null
@@ -76,7 +73,7 @@ internal object SkiaTypefaceEmbedder {
         }
     }
 
-    /** Rebuilds a TrueType/OpenType font file from the typeface's raw sfnt tables. */
+    /** Rebuilds a TrueType/OpenType font file (minus GSUB) from the typeface's raw sfnt tables. */
     private fun reconstructSfnt(typeface: Typeface): ByteArray? {
         val tables = typeface.tableTags.orEmpty().mapNotNull { tag ->
             val bytes = typeface.getTableData(tag)?.bytes
@@ -84,49 +81,8 @@ internal object SkiaTypefaceEmbedder {
         }
         if (tables.none { it.first == "glyf" || it.first == "CFF " }) return null
 
-        val numTables = tables.size
-        val sfntVersion = if (tables.any { it.first == "CFF " }) 0x4F54544F else 0x00010000
-        var entrySelector = 0
-        var searchRange = 16
-        while (searchRange * 2 <= numTables * 16) {
-            searchRange *= 2
-            entrySelector++
-        }
-
-        val baos = ByteArrayOutputStream()
-        DataOutputStream(baos).use { out ->
-            out.writeInt(sfntVersion)
-            out.writeShort(numTables)
-            out.writeShort(searchRange)
-            out.writeShort(entrySelector)
-            out.writeShort(numTables * 16 - searchRange)
-            var offset = 12 + numTables * 16
-            for ((tag, bytes) in tables) {
-                out.writeBytes(tag.padEnd(4))
-                out.writeInt(tableChecksum(bytes))
-                out.writeInt(offset)
-                out.writeInt(bytes.size)
-                offset += (bytes.size + 3) and -4
-            }
-            for ((_, bytes) in tables) {
-                out.write(bytes)
-                repeat(((bytes.size + 3) and -4) - bytes.size) { out.writeByte(0) }
-            }
-        }
-        return baos.toByteArray()
-    }
-
-    private fun tableChecksum(bytes: ByteArray): Int {
-        var sum = 0
-        var i = 0
-        while (i < bytes.size) {
-            var word = 0
-            for (j in 0 until 4) {
-                word = (word shl 8) or if (i + j < bytes.size) (bytes[i + j].toInt() and 0xFF) else 0
-            }
-            sum += word
-            i += 4
-        }
-        return sum
+        val sfntVersion = if (tables.any { it.first == "CFF " }) Type0FontLoader.SFNT_CFF else Type0FontLoader.SFNT_TRUETYPE
+        // GSUB is left out: Skia already shaped the text, PDFBox must not substitute again.
+        return Type0FontLoader.writeSfnt(sfntVersion, Type0FontLoader.filterTables(tables))
     }
 }

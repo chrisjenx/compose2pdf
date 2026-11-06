@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+## 1.5.1
+
+### Fixed
+
+- **Large text-heavy renders were ~3x slower in 1.5.0 than 1.2.0.** Since 1.4.0/1.5.0 embed the app's real fonts, PDFBox parsed each font's GSUB (glyph substitution) table for every document and re-applied it on every `showText` call — compiling a regex per word, plus heavy fontbox DEBUG logging when logging is unconfigured — to text Skia had already shaped. compose2pdf now strips GSUB before PDFBox loads any font (custom/resource/system fonts, bundled Inter and filesystem fonts alike) and caches the GSUB-free font bytes across documents. Glyphs, widths and embedded font subsets are unchanged; a 64-page invoice-style benchmark went from ~86s to ~5–8s, and now runs in the unit suite to catch regressions.
+
 ## 1.5.0
 
 ### Added
